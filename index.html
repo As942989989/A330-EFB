@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>TK A330 EFB (v12)</title>
+    <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAMAAAAKE/YAAAAAbFBMVEUAAADjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgAAAADc0A/lAAAAI3RSTlMAGfCc7vO/gH+wPzC/r39gcGBfX14/MC8vL29vX19fX19fX19J15N5AAAEZUlEQVR42u3c6XbiOhSA4QyBQBodmjaF0vZ+3/+VFs4wQ7FkK7YkK3V9/5WzkCw/WfaSjXF9fX19fX19fX19fX19fX19fX19fX19fX19fX39/9T159v7+8fH+/v72/P19fXydv94//h4f76/f37V9X/W9e324/3j9e3t9fX5/Pj4eP/2/vz4fH97fX1/v/34Vdf/T9f3t/e3t+fH+/vH6+v7x8fb8/vbe13/T93e357fP5/v7+/P7+/Pj4/3t+f6/f/r29v7x/Pj4/3t+fH+/vH89l6v/5e6vb09Pz/eP96fnx/vH2/P9fr/Vbe3t/f3t/fn+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/v7/6/r/wO4gJ5C1X7n2AAAAABJRU5ErkJggg==">
+    
+    <style>
+        body {
+            background-color: #0d0d0d; color: #ccc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+            margin: 0; padding: 0;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+            -webkit-user-select: none;
+            display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+        }
+        .nav-header {
+            background-color: #1e1e1e; border-bottom: 2px solid #e30a17;
+            padding: 15px; text-align: center; font-weight: bold; font-size: 18px; color: #fff;
+            z-index: 10; display: flex; justify-content: space-between; align-items: center;
+            padding-top: max(15px, env(safe-area-inset-top)); margin-top: -env(safe-area-inset-top);
+        }
+        .reset-btn {
+            background: #333; color: #888; border: 1px solid #555;
+            font-size: 10px; padding: 4px 8px; border-radius: 4px; cursor: pointer;
+        }
+        .content-container {
+            flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+            padding: 15px; padding-bottom: 100px;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .bottom-nav {
+            position: fixed; bottom: 0; width: 100%; background-color: #1e1e1e;
+            border-top: 1px solid #333; display: flex; justify-content: space-around;
+            padding: 10px 0; padding-bottom: max(20px, env(safe-area-inset-bottom)); z-index: 20;
+        }
+        .nav-btn {
+            background: none; border: none; color: #666; font-size: 12px;
+            display: flex; flex-direction: column; align-items: center; gap: 5px;
+        }
+        .nav-btn.active { color: #e30a17; }
+        .nav-icon { font-size: 20px; }
+        
+        .flight-card {
+            background-color: #1e1e1e; border: 1px solid #333; border-radius: 8px;
+            margin-bottom: 12px; padding: 15px;
+            display: flex; justify-content: space-between; align-items: flex-start;
+            transition: 0.2s;
+        }
+        .flight-card:active { background-color: #2a2a2a; }
+        .flight-info { flex: 1; margin-right: 10px; }
+        .flight-day { font-size: 12px; color: #e30a17; font-weight: bold; margin-bottom: 4px; }
+        .flight-route { font-size: 15px; color: #fff; font-weight: bold; margin-bottom: 6px; }
+        .flight-desc { font-size: 13px; color: #bbb; line-height: 1.5; white-space: normal; word-break: break-word; }
+        .flight-card.completed { opacity: 0.5; border-color: #2ecc71; }
+        .flight-card.completed .flight-day { color: #2ecc71; }
+        .check-btn {
+            width: 30px; height: 30px; border-radius: 50%; border: 2px solid #555;
+            background: none; display: flex; justify-content: center; align-items: center;
+            color: transparent; flex-shrink: 0; margin-top: 5px;
+        }
+        .flight-card.completed .check-btn {
+            background-color: #2ecc71; border-color: #2ecc71; color: #000;
+        }
+
+        .input-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        label { font-size: 12px; color: #eee; }
+        input {
+            width: 90px; background-color: #000; border: 1px solid #444; color: #00ff00;
+            font-family: monospace; font-size: 16px; text-align: right; padding: 8px; border-radius: 4px;
+        }
+        .section-header {
+            font-size: 12px; color: #e30a17; font-weight: bold; margin-top: 20px;
+            margin-bottom: 8px; border-bottom: 1px dashed #444; padding-bottom: 2px;
+        }
+        .btn-calc {
+            width: 100%; padding: 15px; background-color: #e30a17; color: #fff;
+            border: none; font-size: 16px; font-weight: bold; margin-top: 20px; border-radius: 6px;
+        }
+        .result-box {
+            background-color: #111; border: 1px solid #333; border-radius: 8px;
+            padding: 15px; margin-top: 15px;
+        }
+        .res-table { width: 100%; border-collapse: collapse; }
+        .res-table td { padding: 4px 0; vertical-align: middle; }
+        .res-label { font-size: 12px; color: #888; width: 30%; }
+        .res-cg { font-size: 12px; color: #fff; width: 25%; text-align: right; }
+        .res-val { font-size: 15px; color: #00ff00; font-weight: bold; text-align: right; }
+        .res-pct { font-size: 11px; color: #00bfff; text-align: right; padding-left: 5px;}
+        .divider { border-bottom: 1px solid #222; margin: 8px 0; }
+        .warning-text { color: #e74c3c !important; }
+        .current-flight-banner {
+            background: #2a2a2a; padding: 10px; border-left: 4px solid #00bfff;
+            margin-bottom: 15px; border-radius: 4px;
+        }
+        .banner-desc { font-size: 12px; color: #ddd; margin-top: 4px; line-height: 1.4; }
+        
+        /* 錯誤訊息區 */
+        #error-log {
+            color: #e74c3c; font-size: 10px; padding: 10px; display: none; white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+
+<script>
+    // --- 1. 資料庫 (優先載入) ---
+    const PAX_UNIT_WEIGHT = 84;
+    const flightDB = {
+        "TK1971": { day: "Day 01-1", r: "LTFM-EGLL", ci: 45, pax: 395, f: 9600, a: 6400, d: "Stand F9 -> 236 | 🇪🇺 歐洲幹線｜倫敦高商務需求，前艙滿載貨盤。" },
+        "TK1972": { day: "Day 01-2", r: "EGLL-LTFM", ci: 45, pax: 410, f: 8000, a: 7000, d: "Stand 236 -> D13 | 🇹🇷 返程｜高載客率返程，行李貨物平均。" },
+        "TK2408": { day: "Day 02-1", r: "LTFM-LTAI", ci: 85, pax: 438, f: 3000, a: 8000, d: "Stand G5 -> 114 | 🏖️ 國內快線｜(拖車 D13->G5) 安塔利亞遊客多，後艙行李滿載。" },
+        "TK2409": { day: "Day 02-2", r: "LTAI-LTFM", ci: 85, pax: 440, f: 3000, a: 8500, d: "Stand 114 -> G3 | 🇹🇷 返程｜滿座返程，大量行李導致重心偏後。" },
+        "TK003":  { day: "Day 03-1", r: "LTFM-KJFK", ci: 20, pax: 320, f: 9000, a: 5000, d: "Stand F5 -> 5 | 🇺🇸 北美洲際｜(拖車 G3->F5) 紐約長程，限制載客以換取油量與貨運。" },
+        "TK004":  { day: "Day 04-1", r: "KJFK-LTFM", ci: 20, pax: 335, f: 9500, a: 5500, d: "Stand 5 -> B6 | 🇹🇷 跨大西洋｜美東快遞包裹多，前艙重載。" },
+        "TK415":  { day: "Day 05-1", r: "LTFM-UUDD", ci: 40, pax: 380, f: 8500, a: 6500, d: "Stand B6 -> 18 | 🇷🇺 俄國幹線｜莫斯科客貨混載，高運量航班。" },
+        "TK416":  { day: "Day 05-2", r: "UUDD-LTFM", ci: 40, pax: 390, f: 8000, a: 7000, d: "Stand 18 -> A5 | 🇹🇷 返程｜標準配置返回樞紐。" },
+        "TK1587": { day: "Day 06-1", r: "LTFM-EDDF", ci: 45, pax: 365, f: 7500, a: 7500, d: "Stand A5 -> B26 | 🇪🇺 歐洲樞紐｜法蘭克福轉機客多，行李與貨物平衡。" },
+        "TK1588": { day: "Day 06-2", r: "EDDF-LTFM", ci: 45, pax: 370, f: 7500, a: 7500, d: "Stand B26 -> D15 | 🇹🇷 返程｜標準轉機配置。" },
+        "TK064":  { day: "Day 07-1", r: "LTFM-VTBS", ci: 15, pax: 425, f: 6000, a: 9500, d: "Stand D15 -> E5 | 🇹🇭 亞洲長程｜曼谷團客滿載，後艙行李箱爆滿。" },
+        "TK065":  { day: "Day 08-1", r: "VTBS-LTFM", ci: 15, pax: 415, f: 9000, a: 7000, d: "Stand E5 -> F14 | 🇹🇷 亞洲返程｜回程載運熱帶水果與貨物，前艙增重。" },
+        "TK1953": { day: "Day 09-1", r: "LTFM-EHAM", ci: 45, pax: 385, f: 8200, a: 6800, d: "Stand F14 -> F6 | 🇪🇺 歐洲幹線｜阿姆斯特丹，鮮花與商業貨物混載。" },
+        "TK1954": { day: "Day 09-2", r: "EHAM-LTFM", ci: 45, pax: 390, f: 8000, a: 7000, d: "Stand F6 -> B12 | 🇹🇷 返程｜標準商務貨運配置。" },
+        "TK044":  { day: "Day 10-1", r: "LTFM-FACT", ci: 18, pax: 295, f: 6000, a: 4000, d: "Stand B12 -> A4 | 🇿🇦 非洲長程｜開普敦極限航程，嚴格限制載重。" },
+        "TK045":  { day: "Day 11-1", r: "FACT-LTFM", ci: 18, pax: 300, f: 6000, a: 4500, d: "Stand A4 -> F18 | 🇹🇷 非洲返程｜南非農產品，保持中性平衡。" },
+        "TK762":  { day: "Day 12-1", r: "LTFM-OMDB", ci: 40, pax: 360, f: 7000, a: 8500, d: "Stand F18 -> F12 | 🇦🇪 中東商務｜杜拜購物客多，行李量大。" },
+        "TK763":  { day: "Day 12-2", r: "OMDB-LTFM", ci: 40, pax: 355, f: 7000, a: 8000, d: "Stand F12 -> D4 | 🇹🇷 返程｜轉機行李為主。" },
+        "TK2312": { day: "Day 13-1", r: "LTFM-LTBJ", ci: 85, pax: 430, f: 3500, a: 8500, d: "Stand G7 -> 224 | 🏖️ 國內快線｜(拖車 D4->G7) 伊茲密爾通勤，後艙高密度行李。" },
+        "TK2313": { day: "Day 13-2", r: "LTBJ-LTFM", ci: 85, pax: 435, f: 3500, a: 9000, d: "Stand 224 -> G9 | 🇹🇷 返程｜國內線高密度載客與託運。" },
+        "TK191":  { day: "Day 14-1", r: "LTFM-EDDM", ci: 45, pax: 350, f: 8800, a: 6200, d: "Stand A3 -> 206 | 🇩🇪 歐洲幹線｜(拖車 G9->A3) 慕尼黑，工業零件前艙裝載。" },
+        "TK192":  { day: "Day 14-2", r: "EDDM-LTFM", ci: 45, pax: 360, f: 8500, a: 6500, d: "Stand 206 -> F7 | 🇹🇷 返程｜標準商務配置。" },
+        "TK054":  { day: "Day 15-1", r: "LTFM-WSSS", ci: 15, pax: 310, f: 9800, a: 5200, d: "Stand F7 -> A16 | 🇸🇬 亞洲長程｜新加坡，大量轉運貨盤，前艙重載。" },
+        "TK055":  { day: "Day 16-1", r: "WSSS-LTFM", ci: 15, pax: 315, f: 9500, a: 5500, d: "Stand A16 -> D9 | 🇹🇷 亞洲返程｜電子產品與高價貨物，前艙優先。" },
+        "TK1821": { day: "Day 17-1", r: "LTFM-LFPG", ci: 45, pax: 375, f: 7500, a: 7500, d: "Stand D9 -> A12 | 🇫🇷 歐洲幹線｜巴黎，時尚精品與行李混載，平衡模式。" },
+        "TK1822": { day: "Day 17-2", r: "LFPG-LTFM", ci: 45, pax: 380, f: 7500, a: 7500, d: "Stand A12 -> B4 | 🇹🇷 返程｜標準配置。" },
+        "TK096":  { day: "Day 18-1", r: "LTFM-OEJN", ci: 35, pax: 441, f: 4000, a:10000, d: "Stand B4 -> 52 | 🇸🇦 宗教航線｜吉達朝覲滿座，後艙行李與聖水超重。" },
+        "TK097":  { day: "Day 18-2", r: "OEJN-LTFM", ci: 35, pax: 441, f: 4000, a:10000, d: "Stand 52 -> D8 | 🇹🇷 返程｜返程同樣滿座，後艙維持極限載重。" },
+        "TK033":  { day: "Day 19-1", r: "LTFM-KIAH", ci: 15, pax: 290, f: 9500, a: 4500, d: "Stand D8 -> D8 | 🇺🇸 北美洲際｜休士頓，石油探勘重設備，前艙高密度。" },
+        "TK034":  { day: "Day 20-1", r: "KIAH-LTFM", ci: 15, pax: 300, f: 9000, a: 5000, d: "Stand D8 -> F11 | 🇹🇷 跨大西洋｜商務貨運為主，長程省油模式。" },
+        "TK350":  { day: "Day 21-1", r: "LTFM-UAAA", ci: 30, pax: 340, f: 8000, a: 6000, d: "Stand F11 -> 5 | 🇰🇿 中亞幹線｜阿拉木圖，一般貿易貨物。" },
+        "TK351":  { day: "Day 21-2", r: "UAAA-LTFM", ci: 30, pax: 345, f: 7500, a: 6500, d: "Stand 5 -> A9 | 🇹🇷 返程｜標準配置。" },
+        "TK1909": { day: "Day 22-1", r: "LTFM-LSZH", ci: 45, pax: 360, f: 8500, a: 6500, d: "Stand A9 -> E23 | 🇨🇭 歐洲樞紐｜蘇黎世，高價值貨物(貴金屬)前艙保安裝載。" },
+        "TK1910": { day: "Day 22-2", r: "LSZH-LTFM", ci: 45, pax: 365, f: 8000, a: 7000, d: "Stand E23 -> D11 | 🇹🇷 返程｜標準配置。" },
+        "TK2418": { day: "Day 23-1", r: "LTFM-LTAI", ci: 85, pax: 435, f: 3000, a: 8500, d: "Stand G3 -> 112 | 🏖️ 國內快線｜(拖車 D11->G3) 再次支援國內線，行李為主。" },
+        "TK2419": { day: "Day 23-2", r: "LTAI-LTFM", ci: 85, pax: 438, f: 3000, a: 8800, d: "Stand 112 -> G5 | 🇹🇷 返程｜標準國內線配置。" },
+        "TK1985": { day: "Day 24-1", r: "LTFM-EGLL", ci: 45, pax: 385, f: 9000, a: 6000, d: "Stand B8 -> 245 | 🇬🇧 歐洲幹線｜(拖車 G5->B8) 倫敦，前艙商業貨盤優先。" },
+        "TK1986": { day: "Day 24-2", r: "EGLL-LTFM", ci: 45, pax: 395, f: 9000, a: 6000, d: "Stand 245 -> F13 | 🇹🇷 返程｜高載貨量返回樞紐。" },
+        "TK081":  { day: "Day 25-1", r: "LTFM-KBOS", ci: 18, pax: 330, f: 8000, a: 6000, d: "Stand F13 -> E8 | 🇺🇸 北美洲際｜波士頓，生鮮/海產與學術包裹。" },
+        "TK082":  { day: "Day 26-1", r: "KBOS-LTFM", ci: 18, pax: 340, f: 8000, a: 6000, d: "Stand E8 -> D4 | 🇹🇷 跨大西洋｜標準洲際配置。" },
+        "TK690":  { day: "Day 27-1", r: "LTFM-HECA", ci: 50, pax: 400, f: 7000, a: 7000, d: "Stand D4 -> 31 | 🇪🇬 非洲短程｜開羅，短程高運量，行李貨物平均。" },
+        "TK691":  { day: "Day 27-2", r: "HECA-LTFM", ci: 50, pax: 405, f: 7000, a: 7000, d: "Stand 31 -> A7 | 🇹🇷 返程｜標準配置。" },
+        "TK1855": { day: "Day 28-1", r: "LTFM-LEBL", ci: 45, pax: 420, f: 6000, a: 9000, d: "Stand A7 -> 212 | 🇪🇸 歐洲度假｜巴塞隆納，郵輪旅客多，行李量大。" },
+        "TK1856": { day: "Day 28-2", r: "LEBL-LTFM", ci: 45, pax: 425, f: 6000, a: 9000, d: "Stand 212 -> F15 | 🇹🇷 返程｜行李優先配置。" },
+        "TK772":  { day: "Day 29-1", r: "LTFM-OKKK", ci: 35, pax: 350, f: 8500, a: 5500, d: "Stand F15 -> 32 | 🇰🇼 中東短程｜科威特，夜間快遞/商業貨物多。" },
+        "TK773":  { day: "Day 29-2", r: "OKKK-LTFM", ci: 35, pax: 355, f: 8000, a: 6000, d: "Stand 32 -> B10 | 🇹🇷 返程｜返回伊斯坦堡。" },
+        "TK2826": { day: "Day 30-1", r: "LTFM-LTCG", ci: 85, pax: 435, f: 4000, a: 4000, d: "Stand G7 -> 6 | 🇹🇷 國內挑戰｜(拖車 B10->G7) 特拉布宗，跑道較短，刻意減少貨重。" },
+        "TK2827": { day: "Day 30-2", r: "LTCG-LTFM", ci: 85, pax: 435, f: 4000, a: 4000, d: "Stand 6 -> S5 | 🏁 任務結束｜返回伊斯坦堡，停靠遠端機坪。" }
+    };
+</script>
+
+    <div class="nav-header">
+        TK A330 EFB
+        <button class="reset-btn" onclick="clearAllData()">RESET ALL</button>
+    </div>
+
+    <div class="content-container">
+        <div id="error-log"></div>
+
+        <div id="tab-roster" class="tab-content active">
+            <div id="roster-list"></div>
+            <div style="text-align:center; color:#555; font-size:12px; margin-top:20px;">
+                — END OF ROSTER —
+            </div>
+        </div>
+
+        <div id="tab-calc" class="tab-content">
+            <div class="current-flight-banner">
+                <div style="font-size:12px; color:#aaa;">CURRENT FLIGHT</div>
+                <div id="calc-flight-title" style="color:#fff; font-weight:bold; font-size:16px;">NO FLIGHT SELECTED</div>
+                <div id="calc-flight-desc" class="banner-desc">Please select from Roster</div>
+            </div>
+
+            <div class="section-header">LOAD DATA</div>
+            <div class="input-row">
+                <label>OEW</label>
+                <input type="number" id="oew" value="129855" oninput="saveInputs()">
+            </div>
+            <div class="input-row">
+                <label>PAX</label>
+                <input type="number" id="pax-count" oninput="updatePaxWeight(); saveInputs();">
+            </div>
+            <div class="input-row">
+                <label>PAX WT</label>
+                <input type="number" id="pax-weight" readonly style="color:#666; border-color:#333;">
+            </div>
+
+            <div class="section-header">CARGO SPLIT</div>
+            <div class="input-row">
+                <label>FWD</label>
+                <input type="number" id="cargo-fwd" oninput="updateTotalCargo(); saveInputs();">
+            </div>
+            <div class="input-row">
+                <label>AFT</label>
+                <input type="number" id="cargo-aft" oninput="updateTotalCargo(); saveInputs();">
+            </div>
+            <div class="input-row">
+                <label style="color:#666;">TOTAL</label>
+                <input type="number" id="cargo-total" readonly style="color:#666; border-color:#333;">
+            </div>
+
+            <div class="section-header">FUEL & PERF</div>
+            <div class="input-row">
+                <label>T.FUEL</label>
+                <input type="number" id="fuel-total" oninput="saveInputs()">
+            </div>
+            <div class="input-row">
+                <label style="color:#ff9900;">TRIP</label>
+                <input type="number" id="trip-fuel" style="border-color:#ff9900;" oninput="saveInputs()">
+            </div>
+            <div class="input-row">
+                <label>OAT / FLEX</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="number" id="oat" placeholder="OAT" oninput="saveInputs()">
+                    <input type="number" id="flex" placeholder="FLEX" oninput="saveInputs()">
+                </div>
+            </div>
+
+            <button class="btn-calc" onclick="calculate()">CALCULATE</button>
+
+            <div class="result-box">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span style="color:#888; font-size:12px;">WEIGHT CHECK</span>
+                    <span id="weight-check" style="font-size:12px; font-weight:bold; color:#fff;">--- / ---</span>
+                </div>
+                <table class="res-table">
+                    <tr>
+                        <td class="res-label">T.O. TRIM</td>
+                        <td class="res-cg" id="res-tocg">CG --%</td>
+                        <td class="res-val" id="res-totrim">--</td>
+                        <td class="res-pct" id="res-to-pct">(--%)</td>
+                    </tr>
+                    <tr>
+                        <td class="res-label" style="color:#00bfff;">CRZ TRIM</td>
+                        <td class="res-cg" id="res-crzcg" style="color:#aaa;">CG --%</td>
+                        <td class="res-val" id="res-crztrim" style="color:#00bfff;">--</td>
+                        <td class="res-pct" id="res-crz-pct">(--%)</td>
+                    </tr>
+                    <tr>
+                        <td class="res-label" style="color:#ffcc00;">LDG TRIM</td>
+                        <td class="res-cg" id="res-ldgcg" style="color:#aaa;">CG --%</td>
+                        <td class="res-val" id="res-ldgtrim" style="color:#ffcc00;">--</td>
+                        <td class="res-pct" id="res-ldg-pct">(--%)</td>
+                    </tr>
+                </table>
+                <div class="divider"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span class="res-label">N1 TARGET</span>
+                    <span id="res-n1" style="font-size:18px; font-weight:bold; color:#fff;">--.-%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <button class="nav-btn active" onclick="switchTab('roster')" id="btn-roster">
+            <span class="nav-icon">📅</span><span>ROSTER</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('calc')" id="btn-calc">
+            <span class="nav-icon">🧮</span><span>DISPATCH</span>
+        </button>
+    </div>
+
+<script>
+    // --- 安全的 Storage 存取函式 (核心修復) ---
+    function safeGetItem(key) {
+        try {
+            return localStorage.getItem(key);
+        } catch (e) {
+            logError("Storage Read Blocked: " + e);
+            return null; // 回傳空值，避免程式崩潰
+        }
+    }
+
+    function safeSetItem(key, value) {
+        try {
+            localStorage.setItem(key, value);
+        } catch (e) {
+            logError("Storage Write Blocked (Data Won't Save): " + e);
+        }
+    }
+
+    function safeRemoveItem(key) {
+        try {
+            localStorage.removeItem(key);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function logError(msg) {
+        const log = document.getElementById('error-log');
+        log.style.display = 'block';
+        log.innerText = msg;
+    }
+
+    // --- 全局變數 ---
+    let completedFlights = {};
+    try {
+        completedFlights = JSON.parse(safeGetItem('tk_roster_status_v12')) || {};
+    } catch(e) {
+        completedFlights = {};
+    }
+
+    // --- 初始化 ---
+    window.onload = function() {
+        renderRoster();
+        loadInputs();
+    };
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById('tab-' + tabName).classList.add('active');
+        document.getElementById('btn-' + tabName).classList.add('active');
+    }
+
+    function renderRoster() {
+        const list = document.getElementById('roster-list');
+        list.innerHTML = ''; 
+
+        for (const [flightNo, data] of Object.entries(flightDB)) {
+            const isDone = completedFlights[flightNo] === true;
+            
+            const card = document.createElement('div');
+            card.className = `flight-card ${isDone ? 'completed' : ''}`;
+            card.onclick = (e) => {
+                if(e.target.classList.contains('check-btn') || e.target.parentNode.classList.contains('check-btn')) return;
+                loadFlightToCalc(flightNo);
+            };
+
+            card.innerHTML = `
+                <div class="flight-info">
+                    <div class="flight-day">${data.day} | ${flightNo}</div>
+                    <div class="flight-route">${data.r}</div>
+                    <div class="flight-desc">${data.d}</div>
+                </div>
+                <button class="check-btn" onclick="toggleComplete('${flightNo}')">
+                    ✓
+                </button>
+            `;
+            list.appendChild(card);
+        }
+    }
+
+    function toggleComplete(flightNo) {
+        if (completedFlights[flightNo]) {
+            delete completedFlights[flightNo];
+        } else {
+            completedFlights[flightNo] = true;
+        }
+        safeSetItem('tk_roster_status_v12', JSON.stringify(completedFlights));
+        renderRoster();
+    }
+
+    function loadFlightToCalc(flightNo) {
+        const data = flightDB[flightNo];
+        if (!data) return;
+
+        document.getElementById('pax-count').value = data.pax;
+        document.getElementById('cargo-fwd').value = data.f;
+        document.getElementById('cargo-aft').value = data.a;
+        
+        document.getElementById('calc-flight-title').innerText = `${flightNo} (CI ${data.ci})`;
+        document.getElementById('calc-flight-desc').innerText = `${data.r} | ${data.d}`;
+        
+        updatePaxWeight();
+        updateTotalCargo();
+        saveInputs();
+        switchTab('calc');
+    }
+
+    function updatePaxWeight() {
+        let count = parseFloat(document.getElementById("pax-count").value) || 0;
+        document.getElementById("pax-weight").value = count * PAX_UNIT_WEIGHT;
+    }
+
+    function updateTotalCargo() {
+        let f = parseFloat(document.getElementById("cargo-fwd").value) || 0;
+        let a = parseFloat(document.getElementById("cargo-aft").value) || 0;
+        document.getElementById("cargo-total").value = f + a;
+    }
+
+    function calculate() {
+        let oew = parseFloat(document.getElementById('oew').value);
+        let paxWt = parseFloat(document.getElementById('pax-weight').value) || 0;
+        let cFwd = parseFloat(document.getElementById("cargo-fwd").value) || 0;
+        let cAft = parseFloat(document.getElementById("cargo-aft").value) || 0;
+        let fuel = parseFloat(document.getElementById('fuel-total').value) || 0;
+        let tripFuel = parseFloat(document.getElementById('trip-fuel').value) || 0;
+        let oat = parseFloat(document.getElementById('oat').value);
+        let flex = parseFloat(document.getElementById('flex').value);
+        
+        let tow = oew + paxWt + cFwd + cAft + fuel;
+        let ldw = tow - tripFuel;
+        let midW = tow - (tripFuel / 2);
+
+        let towText = (tow/1000).toFixed(1) + "T";
+        let ldwText = (ldw/1000).toFixed(1) + "T";
+        let towHtml = tow > 242000 ? `<span class="warning-text">${towText}</span>` : towText;
+        let ldwHtml = ldw > 185000 ? `<span class="warning-text">${ldwText}</span>` : ldwText;
+        document.getElementById('weight-check').innerHTML = `${towHtml} / ${ldwHtml}`;
+
+        let armOEW = 22.0; let armPax = 32.0; let armFwd = -60.0; let armAft = 80.0; let armFuel = 28.0;
+        
+        let totalMomentTO = (oew*armOEW) + (paxWt*armPax) + (cFwd*armFwd) + (cAft*armAft) + (fuel*armFuel);
+        let cgTO = totalMomentTO / tow;
+        
+        let mBurnHalf = (tripFuel / 2) * armFuel;
+        let totalMomentCrz = totalMomentTO - mBurnHalf;
+        let cgCrz = totalMomentCrz / midW;
+
+        let mBurnFull = tripFuel * armFuel; 
+        let totalMomentLdg = totalMomentTO - mBurnFull;
+        let cgLdg = totalMomentLdg / ldw;
+
+        function calcRawTrim(cg) {
+            let val = (30 - cg) * 0.17;
+            if (val > 13.5) val = 13.5; if (val < -4.0) val = -4.0;
+            return val;
+        }
+        function formatTrimText(val) {
+            let dir = val >= 0 ? "UP " : "DN ";
+            return Math.abs(val) < 0.1 ? "0.0" : dir + Math.abs(val).toFixed(1);
+        }
+        function formatSimPercent(val) {
+            let pct = val >= 0 ? (val / 13.5) * 100 : (val / -4) * -100;
+            return (pct > 0 ? "+" : "") + pct.toFixed(0) + "%";
+        }
+
+        let trimTO = calcRawTrim(cgTO);
+        let trimCrz = calcRawTrim(cgCrz);
+        let trimLdg = calcRawTrim(cgLdg);
+
+        let n1Text = "--.-%";
+        if (!isNaN(oat)) {
+            let calcTemp = (!isNaN(flex) && flex > oat) ? flex : oat;
+            let finalN1 = 98.2 - (Math.max(0, calcTemp - 30) * 0.26);
+            if (finalN1 < 75) finalN1 = 75; if (finalN1 > 105) finalN1 = 105;
+            n1Text = finalN1.toFixed(1) + "%";
+        }
+
+        document.getElementById('res-n1').innerText = n1Text;
+        document.getElementById('res-tocg').innerText = cgTO.toFixed(1) + "%";
+        document.getElementById('res-totrim').innerText = formatTrimText(trimTO);
+        document.getElementById('res-to-pct').innerText = "(" + formatSimPercent(trimTO) + ")";
+        document.getElementById('res-crzcg').innerText = cgCrz.toFixed(1) + "%";
+        document.getElementById('res-crztrim').innerText = formatTrimText(trimCrz);
+        document.getElementById('res-crz-pct').innerText = "(" + formatSimPercent(trimCrz) + ")";
+        document.getElementById('res-ldgcg').innerText = cgLdg.toFixed(1) + "%";
+        document.getElementById('res-ldgtrim').innerText = formatTrimText(trimLdg);
+        document.getElementById('res-ldg-pct').innerText = "(" + formatSimPercent(trimLdg) + ")";
+        
+        saveInputs();
+    }
+
+    function saveInputs() {
+        const data = {
+            oew: document.getElementById('oew').value,
+            pax: document.getElementById('pax-count').value,
+            fwd: document.getElementById('cargo-fwd').value,
+            aft: document.getElementById('cargo-aft').value,
+            fuel: document.getElementById('fuel-total').value,
+            trip: document.getElementById('trip-fuel').value,
+            oat: document.getElementById('oat').value,
+            flex: document.getElementById('flex').value,
+            title: document.getElementById('calc-flight-title').innerText,
+            desc: document.getElementById('calc-flight-desc').innerText
+        };
+        safeSetItem('tk_calc_inputs_v12', JSON.stringify(data));
+    }
+
+    function loadInputs() {
+        const saved = safeGetItem('tk_calc_inputs_v12');
+        if (saved) {
+            try {
+                const data = JSON.parse(saved);
+                if(data.oew) document.getElementById('oew').value = data.oew;
+                if(data.pax) document.getElementById('pax-count').value = data.pax;
+                if(data.fwd) document.getElementById('cargo-fwd').value = data.fwd;
+                if(data.aft) document.getElementById('cargo-aft').value = data.aft;
+                if(data.fuel) document.getElementById('fuel-total').value = data.fuel;
+                if(data.trip) document.getElementById('trip-fuel').value = data.trip;
+                if(data.oat) document.getElementById('oat').value = data.oat;
+                if(data.flex) document.getElementById('flex').value = data.flex;
+                if(data.title) document.getElementById('calc-flight-title').innerText = data.title;
+                if(data.desc) document.getElementById('calc-flight-desc').innerText = data.desc;
+                
+                updatePaxWeight();
+                updateTotalCargo();
+            } catch(e) {}
+        }
+    }
+
+    function clearAllData() {
+        if(confirm("重置所有進度與數據？")) {
+            safeRemoveItem('tk_calc_inputs_v12');
+            safeRemoveItem('tk_roster_status_v12');
+            location.reload();
+        }
+    }
+</script>
+
+</body>
+</html>
