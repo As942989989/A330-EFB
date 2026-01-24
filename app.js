@@ -1,12 +1,13 @@
-const PAX_UNIT_WEIGHT = 44; 
+// --- 安全存取 ---
 function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function safeSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function safeRem(k){try{localStorage.removeItem(k)}catch(e){}}
 let completedFlights = JSON.parse(safeGet('tk_roster_v15')) || {};
 
 window.onload = function() {
-    if (!window.flightDB || !window.perfDB) {
-        alert("DB Missing! Check roster.js / perf_db.js");
+    // 檢查資料庫完整性
+    if (!window.flightDB || !window.perfDB || !window.weightDB) {
+        alert("⚠️ 錯誤：資料庫不完整！\n請確認 roster.js, perf_db.js, weights.js 皆已存在。");
     } else {
         renderRoster();
     }
@@ -44,14 +45,20 @@ function loadFlight(k) {
     document.getElementById('pax-count').value = d.pax;
     document.getElementById('cargo-fwd').value = d.f;
     document.getElementById('cargo-aft').value = d.a;
-    // 更新頂部資訊
+    
     document.getElementById('to-flight-title').innerText = k;
     document.getElementById('ldg-flight-desc').innerText = k + " (" + d.r + ")";
     
     updatePaxWeight(); updateTotalCargo(); saveInputs(); switchTab('takeoff');
 }
 
-function updatePaxWeight(){document.getElementById("pax-weight").value=(parseFloat(document.getElementById("pax-count").value)||0)*PAX_UNIT_WEIGHT;}
+// 使用外部重量資料庫
+function updatePaxWeight(){
+    if(!window.weightDB) return;
+    let unit = window.weightDB.pax_unit; // 84 kg
+    document.getElementById("pax-weight").value=(parseFloat(document.getElementById("pax-count").value)||0)*unit;
+}
+
 function updateTotalCargo(){document.getElementById("cargo-total").value=(parseFloat(document.getElementById("cargo-fwd").value)||0)+(parseFloat(document.getElementById("cargo-aft").value)||0);}
 
 function interpolate(w, t) {
@@ -76,8 +83,12 @@ function interpolateVLS(w, t) {
 
 // --- 起飛計算 ---
 function calculateTakeoff() {
-    if(!window.perfDB) return;
-    let oew=129855, pax=parseFloat(document.getElementById('pax-weight').value)||0, cgo=parseFloat(document.getElementById('cargo-total').value)||0, fuel=parseFloat(document.getElementById('fuel-total').value)||0;
+    if(!window.perfDB || !window.weightDB) return;
+    
+    // 從 DB 讀取 OEW
+    let oew = window.weightDB.oew; 
+    
+    let pax=parseFloat(document.getElementById('pax-weight').value)||0, cgo=parseFloat(document.getElementById('cargo-total').value)||0, fuel=parseFloat(document.getElementById('fuel-total').value)||0;
     let tow = (oew+pax+cgo+fuel)/1000;
 
     let len=parseFloat(document.getElementById('to-rwy-len').value)||3000, wet=document.getElementById('to-rwy-cond').value==='WET';
@@ -101,6 +112,11 @@ function calculateTakeoff() {
     let trimStr=(trimVal>=0?"UP ":"DN ")+Math.abs(trimVal).toFixed(1);
 
     document.getElementById('res-tow').innerText=tow.toFixed(1)+" T";
+    
+    // MTOW 超重檢查
+    if(tow*1000 > window.weightDB.limits.mtow) document.getElementById('res-tow').style.color = "#e74c3c";
+    else document.getElementById('res-tow').style.color = "#fff";
+
     document.getElementById('res-conf').innerText=conf;
     document.getElementById('res-flex').innerText=(flex==="TOGA")?"TOGA":flex+"°";
     document.getElementById('res-trim').innerText=trimStr;
@@ -108,15 +124,17 @@ function calculateTakeoff() {
     document.getElementById('res-vr').innerText=Math.round(vr);
     document.getElementById('res-v2').innerText=Math.round(v2);
     
-    // 更新降落頁面的預覽數據
     document.getElementById('disp-tow').value = tow.toFixed(1) + " T";
     saveInputs();
 }
 
 // --- 降落計算 ---
 function calculateLanding() {
-    if(!window.perfDB) return;
-    let oew=129855, pax=parseFloat(document.getElementById('pax-weight').value)||0, cgo=parseFloat(document.getElementById('cargo-total').value)||0, fuel=parseFloat(document.getElementById('fuel-total').value)||0, trip=parseFloat(document.getElementById('trip-fuel').value)||0;
+    if(!window.perfDB || !window.weightDB) return;
+    
+    let oew = window.weightDB.oew;
+
+    let pax=parseFloat(document.getElementById('pax-weight').value)||0, cgo=parseFloat(document.getElementById('cargo-total').value)||0, fuel=parseFloat(document.getElementById('fuel-total').value)||0, trip=parseFloat(document.getElementById('trip-fuel').value)||0;
     let ldw = ((oew+pax+cgo+fuel) - trip)/1000;
 
     let len=parseFloat(document.getElementById('ldg-rwy-len').value)||3000, wet=document.getElementById('ldg-rwy-cond').value==='WET';
@@ -128,6 +146,11 @@ function calculateLanding() {
     let ab = (len<2400||wet)?"MED":"LO";
 
     document.getElementById('res-ldw').innerText=ldw.toFixed(1)+" T";
+
+    // MLW 超重檢查
+    if(ldw*1000 > window.weightDB.limits.mlw) document.getElementById('res-ldw').style.color = "#e74c3c";
+    else document.getElementById('res-ldw').style.color = "#fff";
+
     document.getElementById('res-vapp').innerText=vapp;
     document.getElementById('res-autobrake').innerText=ab;
     document.getElementById('disp-trip').value = "-" + (trip/1000).toFixed(1) + " T";
@@ -156,9 +179,8 @@ function loadInputs() {
         if(d.title) document.getElementById('to-flight-title').innerText = d.title;
         if(d.desc) document.getElementById('ldg-flight-desc').innerText = d.desc;
         updatePaxWeight(); updateTotalCargo();
-        // 觸發一次顯示更新
-        if(d['fuel-total']) {
-            let tow = (129855 + parseFloat(document.getElementById('pax-weight').value) + parseFloat(document.getElementById('cargo-total').value) + parseFloat(d['fuel-total']))/1000;
+        if(d['fuel-total'] && window.weightDB) {
+            let tow = (window.weightDB.oew + parseFloat(document.getElementById('pax-weight').value) + parseFloat(document.getElementById('cargo-total').value) + parseFloat(d['fuel-total']))/1000;
             document.getElementById('disp-tow').value = tow.toFixed(1) + " T";
             if(d['trip-fuel']) document.getElementById('disp-trip').value = "-" + (parseFloat(d['trip-fuel'])/1000).toFixed(1) + " T";
         }
