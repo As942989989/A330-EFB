@@ -361,9 +361,10 @@ function calculateLanding() {
     document.getElementById('res-vapp').innerText = vapp;
     document.getElementById('res-autobrake').innerText = ab;
     
-    // [v24 New] 顯示合併後的 Trim 與 CG (對應 v24 HTML 結構)
-    document.getElementById('res-ldg-trim-display').innerText = `${ldgTHS.text} (${ldgIF}%)`;
+   // [Fix] 修正 ID 對應錯誤
+    document.getElementById('res-ldg-trim').innerText = `${ldgTHS.text} (${ldgIF}%)`; // 改成 res-ldg-trim
     document.getElementById('res-ldg-cg-display').innerText = ldgCG.toFixed(1) + "%";
+
     
     saveInputs();
 }
