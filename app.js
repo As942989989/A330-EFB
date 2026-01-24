@@ -1,3 +1,7 @@
+// ==========================================
+// 🧠 TK A330 EFB Core v17.0 (Smart Logic)
+// ==========================================
+
 // --- 安全存取 ---
 function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function safeSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
@@ -6,13 +10,14 @@ let completedFlights = JSON.parse(safeGet('tk_roster_v17')) || {};
 
 window.onload = function() {
     if (!window.flightDB || !window.perfDB || !window.weightDB || !window.airportDB) {
-        alert("DB Missing! Check all js files.");
+        alert("⚠️ DB Error! Ensure all JS files are loaded.");
     } else {
         renderRoster();
     }
     loadInputs();
 };
 
+// --- 分頁與介面 ---
 function switchTab(t) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
@@ -42,7 +47,7 @@ function toggle(k) {
 function loadFlight(k) {
     const d = window.flightDB[k];
     document.getElementById('pax-count').value = d.pax;
-    document.getElementById('cargo-fwd').value = d.f; // 假設班表現在給的是 KG 或是您手動輸入
+    document.getElementById('cargo-fwd').value = d.f;
     document.getElementById('cargo-aft').value = d.a;
     
     document.getElementById('to-flight-title').innerText = k + " (" + d.r + ")";
@@ -84,6 +89,7 @@ function applyRunway(prefix) {
     saveInputs();
 }
 
+// --- 輔助計算 ---
 function updatePaxWeight(){
     if(!window.weightDB) return;
     document.getElementById("pax-weight").value=(parseFloat(document.getElementById("pax-count").value)||0)*window.weightDB.pax_unit;
@@ -91,7 +97,6 @@ function updatePaxWeight(){
 function updateTotalCargo(){document.getElementById("cargo-total").value=(parseFloat(document.getElementById("cargo-fwd").value)||0)+(parseFloat(document.getElementById("cargo-aft").value)||0);}
 
 function interpolate(w, t) {
-    // 輸入 w 是 KG, 表格 t 的 key 也是 KG
     for(let i=0; i<t.length-1; i++) {
         if(w>=t[i][0] && w<=t[i+1][0]) {
             let r = (w-t[i][0])/(t[i+1][0]-t[i][0]);
@@ -111,89 +116,153 @@ function interpolateVLS(w, t) {
     return 160;
 }
 
-// --- 起飛計算 (全 KG) ---
+// ============================================
+// 🛫 智慧起飛計算 (Smart Takeoff Logic)
+// ============================================
 function calculateTakeoff() {
     if(!window.perfDB || !window.weightDB) return;
     
-    let oew = window.weightDB.oew; // KG
+    // 1. 獲取數據
+    let oew = window.weightDB.oew; 
     let pax = parseFloat(document.getElementById('pax-weight').value)||0;
     let cgo = parseFloat(document.getElementById('cargo-total').value)||0;
     let fuel = parseFloat(document.getElementById('fuel-total').value)||0;
-    
-    // [重要] 直接相加，不除以1000
-    let tow = oew + pax + cgo + fuel; 
+    let tow = oew + pax + cgo + fuel; // KG
 
-    let len=parseFloat(document.getElementById('to-rwy-len').value)||3000, wet=document.getElementById('to-rwy-cond').value==='WET';
-    let wdir=parseFloat(document.getElementById('to-wind-dir').value)||0, wspd=parseFloat(document.getElementById('to-wind-spd').value)||0, hdg=parseFloat(document.getElementById('to-rwy-hdg').value)||0;
-    let hw = Math.cos(Math.abs(hdg-wdir)*(Math.PI/180))*wspd;
+    let len = parseFloat(document.getElementById('to-rwy-len').value)||3000;
+    let isWet = document.getElementById('to-rwy-cond').value === 'WET';
+    let wdir = parseFloat(document.getElementById('to-wind-dir').value)||0;
+    let wspd = parseFloat(document.getElementById('to-wind-spd').value)||0;
+    let rhdg = parseFloat(document.getElementById('to-rwy-hdg').value)||0;
 
-    // 傳入 tow (KG) 到查表函數
+    // 2. 風向分解 (Wind Components)
+    let angleRad = Math.abs(rhdg - wdir) * (Math.PI / 180);
+    let hw = Math.cos(angleRad) * wspd; // 頂風
+    let tw = (hw < 0) ? Math.abs(hw) : 0; // 順風
+
+    // 3. 決策：襟翼構型 (Flap Config)
+    // 邏輯：如果跑道短 (<2400) 或 極重 (>235T) 或 壓力係數高 -> 用 CONF 2
+    let stress = tow / len; // 壓力係數 (KG/m)
+    let conf = "1+F";
+    if (len < 2400 || tow > 235000 || stress > 80) {
+        conf = "2";
+    }
+
+    // 4. 決策：推力模式 (Flex vs TOGA)
+    let fd = window.perfDB.flex_data;
+    // 基礎 Flex 計算
+    let calcFlex = fd.base_temp + (fd.mtow - tow)*fd.slope_weight + Math.max(0, (len-2500)*fd.slope_runway) + Math.max(0, hw*0.5);
+    let flex = Math.floor(calcFlex);
+
+    // 強制 TOGA 的條件
+    if (len < 2200) flex = "TOGA";      // 跑道太短
+    if (isWet && len < 2600) flex = "TOGA"; // 濕滑且不夠長
+    if (tw > 10) flex = "TOGA";         // 順風超過 10kt
+    if (tow > 240000) flex = "TOGA";    // 接近 MTOW
+    if (flex > fd.max_temp) flex = fd.max_temp; // 上限
+    if (flex < 45 && flex !== "TOGA") flex = "TOGA"; // 如果算出來 Flex 太低(沒省多少)，直接 TOGA 安全
+
+    // 5. 速度查表與修正
     let spd = interpolate(tow, window.perfDB.takeoff_speeds);
-    
-    // 判斷條件也改用 KG (230T -> 230000)
-    let conf = (len<2400||tow>230000)?"2":"1+F"; 
     let corr = window.perfDB.conf_correction[conf] || {v1:0,vr:0,v2:0};
     
-    let v1=spd.v1+corr.v1, vr=spd.vr+corr.vr, v2=spd.v2+corr.v2;
-    if(len<2200) v1-=4;
-    if(wet) v1-=2;
+    let v1 = spd.v1 + corr.v1;
+    let vr = spd.vr + corr.vr;
+    let v2 = spd.v2 + corr.v2;
 
-    let fd=window.perfDB.flex_data;
-    // Flex 計算: (MTOW - TOW) 都是 KG， slope_weight 已經在 DB 改成 0.0006 (per KG)
-    let flex=Math.floor(fd.base_temp+(fd.mtow-tow)*fd.slope_weight+Math.max(0,(len-2500)*fd.slope_runway)+Math.max(0,hw*0.5));
-    if(flex>fd.max_temp) flex=fd.max_temp;
-    if(len<2000||(wet&&len<2400)) flex="TOGA";
+    // V1 修正 (濕滑或短跑道 V1 提前)
+    if (len < 2200) v1 -= 5;
+    if (isWet) v1 -= 6;
+    if (v1 < 115) v1 = 115; // 最小限制
 
-    let trimVal=(window.perfDB.trim_data.ref_cg-28.5)*window.perfDB.trim_data.step;
-    let trimStr=(trimVal>=0?"UP ":"DN ")+Math.abs(trimVal).toFixed(1);
+    // 6. 配平
+    let trimVal = (window.perfDB.trim_data.ref_cg - 28.5) * window.perfDB.trim_data.step;
+    let trimStr = (trimVal >= 0 ? "UP " : "DN ") + Math.abs(trimVal).toFixed(1);
 
-    document.getElementById('res-tow').innerText=Math.round(tow)+" KG";
-    if(tow > window.weightDB.limits.mtow) document.getElementById('res-tow').style.color = "#e74c3c";
-    else document.getElementById('res-tow').style.color = "#fff";
+    // 7. 輸出結果
+    document.getElementById('res-tow').innerText = Math.round(tow) + " KG";
+    document.getElementById('res-tow').style.color = (tow > window.weightDB.limits.mtow) ? "#e74c3c" : "#fff";
 
-    document.getElementById('res-conf').innerText=conf;
-    document.getElementById('res-flex').innerText=(flex==="TOGA")?"TOGA":flex+"°";
-    document.getElementById('res-trim').innerText=trimStr;
-    document.getElementById('res-v1').innerText=Math.round(v1);
-    document.getElementById('res-vr').innerText=Math.round(vr);
-    document.getElementById('res-v2').innerText=Math.round(v2);
-    
-    // 自動填入 Landing GW (TOW - Trip Fuel)
+    document.getElementById('res-conf').innerText = conf;
+    // 如果是 TOGA 顯示紅色，FLEX 顯示藍色
+    let flexEl = document.getElementById('res-flex');
+    flexEl.innerText = (flex === "TOGA") ? "TOGA" : flex + "°";
+    flexEl.style.color = (flex === "TOGA") ? "#e74c3c" : "#00bfff";
+
+    document.getElementById('res-trim').innerText = trimStr;
+    document.getElementById('res-v1').innerText = Math.round(v1);
+    document.getElementById('res-vr').innerText = Math.round(vr);
+    document.getElementById('res-v2').innerText = Math.round(v2);
+
+    // 自動填入降落預估重
     let trip = parseFloat(document.getElementById('trip-fuel').value)||0;
-    let estLdw = tow - trip;
-    document.getElementById('ldg-gw-input').value = Math.round(estLdw);
+    document.getElementById('ldg-gw-input').value = Math.round(tow - trip);
 
     saveInputs();
 }
 
-// --- 降落計算 (全 KG) ---
+// ============================================
+// 🛬 智慧降落計算 (Smart Landing Logic)
+// ============================================
 function calculateLanding() {
     if(!window.perfDB || !window.weightDB) return;
     
     let ldw = parseFloat(document.getElementById('ldg-gw-input').value);
-    
     if(!ldw) {
+        // Fallback 計算
         let oew = window.weightDB.oew;
-        let pax=parseFloat(document.getElementById('pax-weight').value)||0, cgo=parseFloat(document.getElementById('cargo-total').value)||0, fuel=parseFloat(document.getElementById('fuel-total').value)||0, trip=parseFloat(document.getElementById('trip-fuel').value)||0;
+        let pax = parseFloat(document.getElementById('pax-weight').value)||0;
+        let cgo = parseFloat(document.getElementById('cargo-total').value)||0;
+        let fuel = parseFloat(document.getElementById('fuel-total').value)||0;
+        let trip = parseFloat(document.getElementById('trip-fuel').value)||0;
         ldw = (oew + pax + cgo + fuel) - trip;
         document.getElementById('ldg-gw-input').value = Math.round(ldw);
     }
 
-    let len=parseFloat(document.getElementById('ldg-rwy-len').value)||3000, wet=document.getElementById('ldg-rwy-cond').value==='WET';
-    let wdir=parseFloat(document.getElementById('ldg-wind-dir').value)||0, wspd=parseFloat(document.getElementById('ldg-wind-spd').value)||0, hdg=parseFloat(document.getElementById('ldg-rwy-hdg').value)||0;
-    let hw = Math.cos(Math.abs(hdg-wdir)*(Math.PI/180))*wspd;
+    let len = parseFloat(document.getElementById('ldg-rwy-len').value)||3000;
+    let isWet = document.getElementById('ldg-rwy-cond').value === 'WET';
+    let wdir = parseFloat(document.getElementById('ldg-wind-dir').value)||0;
+    let wspd = parseFloat(document.getElementById('ldg-wind-spd').value)||0;
+    let rhdg = parseFloat(document.getElementById('ldg-rwy-hdg').value)||0;
+    
+    // 風向分解
+    let angleRad = Math.abs(rhdg - wdir) * (Math.PI / 180);
+    let hw = Math.cos(angleRad) * wspd;
+    let xw = Math.abs(Math.sin(angleRad) * wspd); // 側風分量
 
-    // 查表 VLS (傳入 KG)
+    // 1. 決策：降落襟翼 (CONF 3 vs FULL)
+    // 邏輯：側風 > 20kt 或 風切 (假設使用者知情) -> CONF 3
+    let conf = "FULL";
+    let vrefAdd = 0;
+    if (xw > 20) {
+        conf = "3";
+        vrefAdd = window.perfDB.landing_conf3_add; // +4kt
+    }
+
+    // 2. 決策：自動煞車 (Autobrake)
+    // 邏輯：濕地 -> MED, 短跑道 -> MED, 極短 -> MAX
+    let ab = "LO";
+    if (len < 2500) ab = "MED";
+    if (isWet) ab = "MED";
+    if (len < 1900) ab = "MAX"; // 緊急
+
+    // 3. 速度計算
     let vls = interpolateVLS(ldw, window.perfDB.landing_vls_full);
-    let vapp = Math.round(vls + Math.max(5, Math.min(15, hw/3)));
-    let ab = (len<2400||wet)?"MED":"LO";
+    // Vapp = VLS + Config修正 + 風修正(最小5, 最大15)
+    let windCorr = Math.max(5, Math.min(15, hw / 3));
+    let vapp = Math.round(vls + vrefAdd + windCorr);
 
-    document.getElementById('res-ldw').innerText=Math.round(ldw)+" KG";
-    if(ldw > window.weightDB.limits.mlw) document.getElementById('res-ldw').style.color = "#e74c3c";
-    else document.getElementById('res-ldw').style.color = "#fff";
+    // 4. 輸出結果
+    document.getElementById('res-ldw').innerText = Math.round(ldw) + " KG";
+    document.getElementById('res-ldw').style.color = (ldw > window.weightDB.limits.mlw) ? "#e74c3c" : "#fff";
 
-    document.getElementById('res-vapp').innerText=vapp;
-    document.getElementById('res-autobrake').innerText=ab;
+    let confEl = document.getElementById('res-conf-ldg');
+    confEl.innerText = conf;
+    // 如果是 CONF 3 (非標準)，顯示黃色提醒
+    confEl.style.color = (conf === "3") ? "#e74c3c" : "#fff";
+
+    document.getElementById('res-vapp').innerText = vapp;
+    document.getElementById('res-autobrake').innerText = ab;
     
     saveInputs();
 }
