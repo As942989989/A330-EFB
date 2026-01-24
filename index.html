@@ -30,11 +30,21 @@
             </div>
 
             <div class="section-header">DEPARTURE RUNWAY</div>
-            <div class="input-row"><label style="color:#00bfff;">SELECT RWY</label><select id="to-rwy-select" onchange="applyRunway('to')"><option value="">MANUAL INPUT</option></select></div>
+            <div class="input-row">
+                <label style="color:#00bfff;">SELECT RWY</label>
+                <select id="to-rwy-select" onchange="applyRunway('to')"><option value="">MANUAL INPUT</option></select>
+            </div>
+            <div style="text-align:right; margin-top:-8px; margin-bottom:8px; font-size:11px; color:#666;">
+                ELEV: <span id="to-elev-disp" style="color:#00bfff;">0</span> FT
+            </div>
+
             <div class="input-row"><label>RWY LEN (FT)</label><input type="number" id="to-rwy-len" placeholder="10000" oninput="saveInputs()"></div>
             <div class="input-row"><label>RWY COND</label><select id="to-rwy-cond" onchange="saveInputs()"><option value="DRY">DRY</option><option value="WET">WET</option></select></div>
             <div class="input-row"><label>WIND (DIR/SPD)</label><div style="display:flex;gap:5px;width:55%;"><input type="number" id="to-wind-dir" placeholder="DIR" oninput="saveInputs()"><input type="number" id="to-wind-spd" placeholder="SPD" oninput="saveInputs()"></div></div>
             <div class="input-row"><label>RWY HDG</label><input type="number" id="to-rwy-hdg" placeholder="HDG" oninput="saveInputs()"></div>
+            
+            <div class="input-row"><label>OAT (°C)</label><input type="number" id="to-oat" placeholder="15" value="15" oninput="saveInputs()"></div>
+
 
             <div class="section-header">LOAD & FUEL (KG)</div>
             <div class="input-row"><label>PAX (44KG)</label><input type="number" id="pax-count" oninput="updatePaxWeight(); saveInputs();"></div>
@@ -84,12 +94,20 @@
                 <div id="ldg-flight-desc" style="color:#fff;font-weight:bold;font-size:12px;">NO FLIGHT</div>
             </div>
 
-            <div class="section-header">ARRIVAL RUNWAY</div>
-            <div class="input-row"><label style="color:#00bfff;">SELECT RWY</label><select id="ldg-rwy-select" onchange="applyRunway('ldg')"><option value="">MANUAL INPUT</option></select></div>
+                   <div class="section-header">ARRIVAL RUNWAY</div>
+            <div class="input-row">
+                <label style="color:#00bfff;">SELECT RWY</label>
+                <select id="ldg-rwy-select" onchange="applyRunway('ldg')"><option value="">MANUAL INPUT</option></select>
+            </div>
+            <div style="text-align:right; margin-top:-8px; margin-bottom:8px; font-size:11px; color:#666;">
+                ELEV: <span id="ldg-elev-disp" style="color:#00bfff;">0</span> FT
+            </div>
+
             <div class="input-row"><label>RWY LEN (FT)</label><input type="number" id="ldg-rwy-len" placeholder="10000" oninput="saveInputs()"></div>
             <div class="input-row"><label>RWY COND</label><select id="ldg-rwy-cond" onchange="saveInputs()"><option value="DRY">DRY</option><option value="WET">WET</option></select></div>
             <div class="input-row"><label>WIND (DIR/SPD)</label><div style="display:flex;gap:5px;width:55%;"><input type="number" id="ldg-wind-dir" placeholder="DIR" oninput="saveInputs()"><input type="number" id="ldg-wind-spd" placeholder="SPD" oninput="saveInputs()"></div></div>
             <div class="input-row"><label>RWY HDG</label><input type="number" id="ldg-rwy-hdg" placeholder="HDG" oninput="saveInputs()"></div>
+
             
             <div class="section-header">WEIGHT (KG)</div>
             <div class="input-row"><label>CURRENT G.W</label><input type="number" id="ldg-gw-input" placeholder="e.g. 180500" oninput="saveInputs()"></div>
