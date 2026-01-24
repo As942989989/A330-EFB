@@ -1,15 +1,15 @@
 // ==========================================
-// 🧠 TK A330 EFB Core v21.0 (Auto TOW CG Display)
+// 🧠 TK A330 EFB Core v22.0 (Atmosphere Logic)
 // ==========================================
 
 function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function safeSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function safeRem(k){try{localStorage.removeItem(k)}catch(e){}}
-let completedFlights = JSON.parse(safeGet('tk_roster_v21')) || {};
+let completedFlights = JSON.parse(safeGet('tk_roster_v22')) || {};
 
 window.onload = function() {
     if (!window.flightDB || !window.perfDB || !window.weightDB || !window.airportDB) {
-        alert("DB Missing!");
+        alert("DB Missing! Check JS files.");
     } else {
         renderRoster();
     }
@@ -38,10 +38,11 @@ function renderRoster() {
 
 function toggle(k) {
     if(completedFlights[k]) delete completedFlights[k]; else completedFlights[k]=true;
-    safeSet('tk_roster_v21', JSON.stringify(completedFlights));
+    safeSet('tk_roster_v22', JSON.stringify(completedFlights));
     renderRoster();
 }
 
+// --- 載入航班與環境數據 ---
 function loadFlight(k) {
     const d = window.flightDB[k];
     document.getElementById('pax-count').value = d.pax;
@@ -54,6 +55,16 @@ function loadFlight(k) {
     let route = d.r.toUpperCase();
     let dep = route.split('-')[0].trim();
     let arr = route.split('-')[1].trim();
+
+    // [v22 Update] 自動填入機場標高
+    if(window.airportDB) {
+        if(window.airportDB[dep]) {
+            document.getElementById('to-elev-disp').innerText = window.airportDB[dep].elev || 0;
+        }
+        if(window.airportDB[arr]) {
+            document.getElementById('ldg-elev-disp').innerText = window.airportDB[arr].elev || 0;
+        }
+    }
 
     populateRunways('to-rwy-select', dep);
     populateRunways('ldg-rwy-select', arr);
@@ -90,7 +101,7 @@ function applyRunway(prefix) {
     saveInputs();
 }
 
-// --- 內部計算 ZFW CG (不寫入 DOM) ---
+// --- 重心估算邏輯 ---
 function computeInternalZFWCG() {
     const BASE_CG = 24.0;
     const PAX_FACTOR = 0.00020;
@@ -150,7 +161,7 @@ function calculateTHS(cg) {
 
 function convertToIF(degRaw) {
     let tp = window.perfDB.trim_physics;
-    let result = 15; // Base
+    let result = 15; 
     if(degRaw > 0) { // UP
         result = 15 + (degRaw * 8); 
     } else { // DN
@@ -160,65 +171,89 @@ function convertToIF(degRaw) {
 }
 
 // ============================================
-// 🛫 起飛計算 (含 TOW CG 顯示)
+// 🛫 起飛計算 (含大氣物理模型)
 // ============================================
 function calculateTakeoff() {
     if(!window.perfDB || !window.weightDB) return;
     
+    // 1. 載重
     let oew = window.weightDB.oew; 
     let pax = parseFloat(document.getElementById('pax-weight').value)||0;
     let cgo = parseFloat(document.getElementById('cargo-total').value)||0;
     let fuel = parseFloat(document.getElementById('fuel-total').value)||0;
     let tow = oew + pax + cgo + fuel; 
 
-    // 環境
+    // 2. 環境 (含標高與氣溫)
     let len = parseFloat(document.getElementById('to-rwy-len').value)||10000;
     let isWet = document.getElementById('to-rwy-cond').value === 'WET';
     let wdir = parseFloat(document.getElementById('to-wind-dir').value)||0;
     let wspd = parseFloat(document.getElementById('to-wind-spd').value)||0;
     let rhdg = parseFloat(document.getElementById('to-rwy-hdg').value)||0;
+    let oat = parseFloat(document.getElementById('to-oat').value)||15; // [New] OAT
+    let elev = parseFloat(document.getElementById('to-elev-disp').innerText)||0; // [New] Elev
+
     let hw = Math.cos(Math.abs(rhdg-wdir)*(Math.PI/180))*wspd;
     let tw = (hw < 0) ? Math.abs(hw) : 0;
 
-    // --- 決策 ---
+    // 3. 構型決策
     let stress = tow / len; 
     let conf = "1+F";
     if (len < 8000 || tow > 235000 || stress > 25) conf = "2";
 
+    // 4. [v22 New] Flex 物理運算 (Density Altitude Logic)
     let fd = window.perfDB.flex_data;
-    let calcFlex = fd.base_temp + (fd.mtow - tow)*fd.slope_weight + Math.max(0, (len-8200)*fd.slope_runway) + Math.max(0, hw*0.5);
-    let flex = Math.floor(calcFlex);
+    
+    // 4a. 基礎 Flex (基於載重與跑道)
+    let baseFlex = fd.base_temp + (fd.mtow - tow)*fd.slope_weight + Math.max(0, (len-8200)*fd.slope_runway) + Math.max(0, hw*0.5);
+    
+    // 4b. 計算標準大氣溫度 (ISA)
+    // 假設 ISA Sea Level = 15°C, Lapse Rate = 2°C/1000ft
+    let isa = 15 - (elev / 1000 * 2);
+    
+    // 4c. 計算扣減係數 (Penalties)
+    // 高度扣減：空氣稀薄導致推力下降
+    let altPenalty = (elev / 1000) * fd.elev_penalty; 
+    // 溫度扣減：如果比標準大氣還熱，推力更差
+    let tempPenalty = 0;
+    if (oat > isa) {
+        tempPenalty = (oat - isa) * fd.delta_t_penalty;
+    }
 
+    let flex = Math.floor(baseFlex - altPenalty - tempPenalty);
+
+    // 4d. TOGA 強制條件 (Golden Rules)
+    // 如果計算出的 Flex 小於等於實際氣溫，代表減推力不可行 -> TOGA
+    if (flex <= oat) flex = "TOGA"; 
+    else if (flex > fd.max_temp) flex = fd.max_temp;
+    else if (flex < oat + 5 && flex !== "TOGA") flex = "TOGA"; // 如果只省一點點(5度內)，不如 TOGA 安全
+
+    // 物理極限條件
     if (len < 7200 || (isWet && len < 8500) || tw > 10 || tow > 240000) flex = "TOGA";
-    if (flex > fd.max_temp) flex = fd.max_temp;
-    if (flex < 45 && flex !== "TOGA") flex = "TOGA";
 
+    // 5. 速度
     let spd = interpolate(tow, window.perfDB.takeoff_speeds);
     let corr = window.perfDB.conf_correction[conf] || {v1:0,vr:0,v2:0};
     
     let v1 = spd.v1 + corr.v1;
     let vr = spd.vr + corr.vr;
     let v2 = spd.v2 + corr.v2;
+    // 高海拔速度修正 (TAS 效應，IAS 變化不大，但為了安全V1通常微調)
+    // 這裡維持簡單物理：V1 隨跑道縮短而減少
     if (len < 7200) v1 -= 5;
     if (isWet) v1 -= 6;
     if (v1 < 115) v1 = 115;
 
-    // --- TOW CG 與 TRIM 計算 ---
-    // 1. 自動算出 ZFW CG
+    // 6. 重心與配平 (TOW CG)
     let zfwCG = computeInternalZFWCG();
-    
-    // 2. 計算 TOW CG (燃油影響)
-    // 燃油每KG移動係數讀取自 DB (預設 0.00004)
     let fuelEffect = fuel * window.perfDB.trim_physics.fuel_cg_effect;
     let towCG = zfwCG + fuelEffect;
-    if(towCG > 42) towCG = 42; // 安全上限
+    if(towCG > 42) towCG = 42;
 
-    // 3. 計算 Trim
     let ths = calculateTHS(towCG);
     let ifTrim = convertToIF(ths.raw);
 
-    // --- CRUISE TRIM 估算 ---
-    let crzCG = towCG + 3.0; // 模擬巡航重心後移
+    // 7. 巡航估算
+    let crzCG = towCG + 3.0; 
     if(crzCG > 42) crzCG = 42;
     let crzTHS = calculateTHS(crzCG);
     let crzIF = convertToIF(crzTHS.raw);
@@ -228,8 +263,6 @@ function calculateTakeoff() {
     // --- 輸出 ---
     document.getElementById('res-tow').innerText = Math.round(tow) + " KG";
     document.getElementById('res-tow').style.color = (tow > window.weightDB.limits.mtow) ? "#e74c3c" : "#fff";
-
-    // 顯示 TOW CG
     document.getElementById('res-tow-cg').innerText = towCG.toFixed(1) + "%";
 
     document.getElementById('res-conf').innerText = conf;
@@ -238,7 +271,6 @@ function calculateTakeoff() {
     flexEl.style.color = (flex === "TOGA") ? "#e74c3c" : "#00bfff";
 
     document.getElementById('res-trim').innerText = `${ths.text} (${ifTrim}%)`;
-    
     document.getElementById('res-v1').innerText = Math.round(v1);
     document.getElementById('res-vr').innerText = Math.round(vr);
     document.getElementById('res-v2').innerText = Math.round(v2);
@@ -294,9 +326,8 @@ function calculateLanding() {
     let windCorr = Math.max(5, Math.min(15, hw / 3));
     let vapp = Math.round(vls + vrefAdd + windCorr);
 
-    // --- Landing Trim ---
     let zfwCG = computeInternalZFWCG();
-    let ldgCG = zfwCG - 0.5; // 假設燃油耗盡，重心稍微前移回歸 ZFW
+    let ldgCG = zfwCG - 0.5; 
     let ldgTHS = calculateTHS(ldgCG);
     let ldgIF = convertToIF(ldgTHS.raw) + 5; 
     if(ldgIF > 100) ldgIF = 100;
@@ -319,18 +350,18 @@ function calculateLanding() {
 
 function saveInputs() {
     const ids = ['pax-count','cargo-fwd','cargo-aft','fuel-total','trip-fuel',
-                 'to-rwy-len','to-rwy-cond','to-wind-dir','to-wind-spd','to-rwy-hdg',
+                 'to-rwy-len','to-rwy-cond','to-wind-dir','to-wind-spd','to-rwy-hdg','to-oat',
                  'ldg-rwy-len','ldg-rwy-cond','ldg-wind-dir','ldg-wind-spd','ldg-rwy-hdg',
                  'ldg-gw-input'];
     let data = {};
     ids.forEach(id => { let el=document.getElementById(id); if(el) data[id]=el.value; });
     data.title = document.getElementById('to-flight-title').innerText;
     data.desc = document.getElementById('ldg-flight-desc').innerText;
-    safeSet('tk_calc_inputs_v21', JSON.stringify(data));
+    safeSet('tk_calc_inputs_v22', JSON.stringify(data));
 }
 
 function loadInputs() {
-    const d = JSON.parse(safeGet('tk_calc_inputs_v21'));
+    const d = JSON.parse(safeGet('tk_calc_inputs_v22'));
     if(d) {
         for(let k in d) {
             let el = document.getElementById(k);
@@ -343,5 +374,5 @@ function loadInputs() {
 }
 
 function clearAllData() {
-    if(confirm("RESET ALL?")) { safeRem('tk_calc_inputs_v21'); safeRem('tk_roster_v21'); location.reload(); }
+    if(confirm("RESET ALL?")) { safeRem('tk_calc_inputs_v22'); safeRem('tk_roster_v22'); location.reload(); }
 }
