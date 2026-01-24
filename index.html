@@ -37,6 +37,7 @@
             <div class="input-row"><label>RWY HDG</label><input type="number" id="to-rwy-hdg" placeholder="HDG" oninput="saveInputs()"></div>
 
             <div class="section-header">LOAD & FUEL (KG)</div>
+            <div class="input-row"><label>ZFW CG (%)</label><input type="number" id="zfw-cg" placeholder="28.5" oninput="saveInputs()"></div>
             <div class="input-row"><label>PAX (44KG)</label><input type="number" id="pax-count" oninput="updatePaxWeight(); saveInputs();"></div>
             <div class="input-row"><label>CARGO FWD</label><input type="number" id="cargo-fwd" placeholder="KG" oninput="updateTotalCargo(); saveInputs();"></div>
             <div class="input-row"><label>CARGO AFT</label><input type="number" id="cargo-aft" placeholder="KG" oninput="updateTotalCargo(); saveInputs();"></div>
@@ -49,11 +50,21 @@
 
             <div class="result-box">
                 <div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="color:#888;font-size:12px;">TAKEOFF WEIGHT</span><span id="res-tow" style="font-size:14px;font-weight:bold;color:#fff;">--- KG</span></div>
+                
                 <div class="perf-section">
                     <div class="perf-title" style="color:#00ff00;">TAKEOFF DATA</div>
-                    <div class="data-grid"><div class="data-item"><div>CONFIG</div><div id="res-conf">1+F</div></div><div class="data-item"><div>FLEX</div><div id="res-flex" style="color:#00bfff;">--</div></div><div class="data-item"><div>TRIM</div><div id="res-trim">--</div></div></div>
+                    <div class="data-grid"><div class="data-item"><div>CONFIG</div><div id="res-conf">1+F</div></div><div class="data-item"><div>FLEX</div><div id="res-flex" style="color:#00bfff;">--</div></div><div class="data-item"><div>TRIM / IF%</div><div id="res-trim">--</div></div></div>
                     <div style="border-bottom:1px solid #333;margin:8px 0;"></div>
                     <div class="data-grid"><div class="data-item"><div>V1</div><div id="res-v1" style="color:#e30a17;">--</div></div><div class="data-item"><div>VR</div><div id="res-vr" style="color:#e30a17;">--</div></div><div class="data-item"><div>V2</div><div id="res-v2" style="color:#e30a17;">--</div></div></div>
+                </div>
+
+                <div class="perf-section" style="margin-top:5px; border-color:#00bfff;">
+                    <div class="perf-title" style="color:#00bfff;">CRUISE EST.</div>
+                    <div class="data-grid">
+                        <div class="data-item"><div>TRIM</div><div id="res-crz-trim">--</div></div>
+                        <div class="data-item"><div>IF %</div><div id="res-crz-trim-pct">--</div></div>
+                        <div class="data-item"><div>GW</div><div id="res-crz-gw">--</div></div>
+                    </div>
                 </div>
             </div>
             <div style="height:50px;"></div>
@@ -81,7 +92,17 @@
                 <div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="color:#888;font-size:12px;">EST. LANDING WEIGHT</span><span id="res-ldw" style="font-size:14px;font-weight:bold;color:#fff;">--- KG</span></div>
                 <div class="perf-section">
                     <div class="perf-title" style="color:#ffcc00;">LANDING DATA</div>
-                    <div class="data-grid"><div class="data-item"><div>VAPP</div><div id="res-vapp" style="color:#ffcc00;">--</div></div><div class="data-item"><div>CONF</div><div id="res-conf-ldg">FULL</div></div><div class="data-item"><div>AUTO BRK</div><div id="res-autobrake">--</div></div></div>
+                    <div class="data-grid">
+                        <div class="data-item"><div>VAPP</div><div id="res-vapp" style="color:#ffcc00;">--</div></div>
+                        <div class="data-item"><div>CONF</div><div id="res-conf-ldg">FULL</div></div>
+                        <div class="data-item"><div>AUTO BRK</div><div id="res-autobrake">--</div></div>
+                    </div>
+                    <div style="border-bottom:1px solid #333;margin:8px 0;"></div>
+                    <div class="data-grid">
+                         <div class="data-item"><div>TRIM</div><div id="res-ldg-trim">--</div></div>
+                         <div class="data-item"><div>IF %</div><div id="res-ldg-trim-pct">--</div></div>
+                         <div class="data-item"><div></div><div></div></div>
+                    </div>
                 </div>
             </div>
             <div style="height:50px;"></div>
