@@ -10,7 +10,6 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
     <script src="roster.js"></script>
     <script src="perf_db.js"></script>
     <script src="weights.js"></script>
@@ -30,14 +29,18 @@
                 <div id="to-flight-title" style="color:#fff;font-weight:bold;">NO FLIGHT</div>
             </div>
 
-            <div class="section-header">DEPARTURE AIRPORT</div>
-            <div class="input-row"><label>AIRPORT</label><select id="to-airport-sel" onchange="updateRunways('to')"><option value="">MANUAL</option></select></div>
-            <div class="input-row"><label>RUNWAY</label><select id="to-rwy-sel" onchange="fillRunwayData('to')"><option value="">SELECT...</option></select></div>
+            <div class="section-header">DEPARTURE RUNWAY</div>
+            <div class="input-row">
+                <label style="color:#00bfff;">SELECT RWY</label>
+                <select id="to-rwy-select" onchange="applyRunway('to')">
+                    <option value="">MANUAL INPUT</option>
+                </select>
+            </div>
             
-            <div class="input-row"><label>RWY LEN (FT)</label><input type="number" id="to-rwy-len" placeholder="FEET" oninput="saveInputs()"></div>
-            <div class="input-row"><label>RWY HDG</label><input type="number" id="to-rwy-hdg" placeholder="MAG" oninput="saveInputs()"></div>
+            <div class="input-row"><label>RWY LEN (M)</label><input type="number" id="to-rwy-len" placeholder="3000" oninput="saveInputs()"></div>
             <div class="input-row"><label>RWY COND</label><select id="to-rwy-cond" onchange="saveInputs()"><option value="DRY">DRY</option><option value="WET">WET</option></select></div>
             <div class="input-row"><label>WIND (DIR/SPD)</label><div style="display:flex;gap:5px;width:55%;"><input type="number" id="to-wind-dir" placeholder="DIR" oninput="saveInputs()"><input type="number" id="to-wind-spd" placeholder="SPD" oninput="saveInputs()"></div></div>
+            <div class="input-row"><label>RWY HDG</label><input type="number" id="to-rwy-hdg" placeholder="HDG" oninput="saveInputs()"></div>
 
             <div class="section-header">LOAD & FUEL</div>
             <div class="input-row"><label>PAX (Total)</label><input type="number" id="pax-count" oninput="updatePaxWeight(); saveInputs();"></div>
@@ -68,18 +71,25 @@
                 <div id="ldg-flight-desc" style="color:#fff;font-weight:bold;font-size:12px;">NO FLIGHT</div>
             </div>
 
-            <div class="section-header">ARRIVAL AIRPORT</div>
-            <div class="input-row"><label>AIRPORT</label><select id="ldg-airport-sel" onchange="updateRunways('ldg')"><option value="">MANUAL</option></select></div>
-            <div class="input-row"><label>RUNWAY</label><select id="ldg-rwy-sel" onchange="fillRunwayData('ldg')"><option value="">SELECT...</option></select></div>
+            <div class="section-header">ARRIVAL RUNWAY</div>
+            <div class="input-row">
+                <label style="color:#00bfff;">SELECT RWY</label>
+                <select id="ldg-rwy-select" onchange="applyRunway('ldg')">
+                    <option value="">MANUAL INPUT</option>
+                </select>
+            </div>
 
-            <div class="input-row"><label>RWY LEN (FT)</label><input type="number" id="ldg-rwy-len" placeholder="FEET" oninput="saveInputs()"></div>
-            <div class="input-row"><label>RWY HDG</label><input type="number" id="ldg-rwy-hdg" placeholder="MAG" oninput="saveInputs()"></div>
+            <div class="input-row"><label>RWY LEN (M)</label><input type="number" id="ldg-rwy-len" placeholder="3000" oninput="saveInputs()"></div>
             <div class="input-row"><label>RWY COND</label><select id="ldg-rwy-cond" onchange="saveInputs()"><option value="DRY">DRY</option><option value="WET">WET</option></select></div>
             <div class="input-row"><label>WIND (DIR/SPD)</label><div style="display:flex;gap:5px;width:55%;"><input type="number" id="ldg-wind-dir" placeholder="DIR" oninput="saveInputs()"><input type="number" id="ldg-wind-spd" placeholder="SPD" oninput="saveInputs()"></div></div>
+            <div class="input-row"><label>RWY HDG</label><input type="number" id="ldg-rwy-hdg" placeholder="HDG" oninput="saveInputs()"></div>
             
-            <div class="section-header">WEIGHT STATUS</div>
-            <div class="input-row"><label>ZFW + FUEL</label><input type="text" id="disp-tow" disabled style="color:#888;border:none;background:none;"></div>
-            <div class="input-row"><label>LESS TRIP</label><input type="text" id="disp-trip" disabled style="color:#ff9900;border:none;background:none;"></div>
+            <div class="section-header">WEIGHT SETTINGS</div>
+            <div class="input-row">
+                <label>CURRENT G.W (T)</label>
+                <input type="number" id="ldg-gw-input" placeholder="e.g. 180.5" oninput="saveInputs()">
+            </div>
+            <div style="font-size:10px;color:#666;text-align:right;margin-bottom:15px;">(Auto-filled from Takeoff - Trip Fuel)</div>
 
             <button class="btn-calc" onclick="calculateLanding()">CALCULATE LANDING</button>
 
