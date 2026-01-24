@@ -1,11 +1,11 @@
 // ==========================================
-// 🧠 TK A330 EFB Core v20.0 (Auto ZFW CG)
+// 🧠 TK A330 EFB Core v21.0 (Auto TOW CG Display)
 // ==========================================
 
 function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function safeSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function safeRem(k){try{localStorage.removeItem(k)}catch(e){}}
-let completedFlights = JSON.parse(safeGet('tk_roster_v20')) || {};
+let completedFlights = JSON.parse(safeGet('tk_roster_v21')) || {};
 
 window.onload = function() {
     if (!window.flightDB || !window.perfDB || !window.weightDB || !window.airportDB) {
@@ -38,7 +38,7 @@ function renderRoster() {
 
 function toggle(k) {
     if(completedFlights[k]) delete completedFlights[k]; else completedFlights[k]=true;
-    safeSet('tk_roster_v20', JSON.stringify(completedFlights));
+    safeSet('tk_roster_v21', JSON.stringify(completedFlights));
     renderRoster();
 }
 
@@ -47,9 +47,6 @@ function loadFlight(k) {
     document.getElementById('pax-count').value = d.pax;
     document.getElementById('cargo-fwd').value = d.f;
     document.getElementById('cargo-aft').value = d.a;
-    
-    // [更新] 移除固定 28.5，改由後續的 update 函數自動計算
-    // document.getElementById('zfw-cg').value = 28.5; 
     
     document.getElementById('to-flight-title').innerText = k + " (" + d.r + ")";
     document.getElementById('ldg-flight-desc').innerText = k + " (" + d.r + ")";
@@ -61,7 +58,6 @@ function loadFlight(k) {
     populateRunways('to-rwy-select', dep);
     populateRunways('ldg-rwy-select', arr);
 
-    // 依序執行更新，最後一項會觸發 CG 計算
     updatePaxWeight(); 
     updateTotalCargo(); 
     saveInputs(); 
@@ -94,40 +90,31 @@ function applyRunway(prefix) {
     saveInputs();
 }
 
-// --- [新功能] 自動 ZFW CG 估算 ---
-function calculateZFWCG() {
-    // A330-300 重心估算參數 (模擬用)
-    const BASE_CG = 24.0;         // 空機重心基準 %
-    const PAX_FACTOR = 0.00020;   // 乘客影響 (每公斤 +0.0002%)
-    const FWD_FACTOR = -0.00050;  // 前貨艙影響 (每公斤 -0.0005%)
-    const AFT_FACTOR = 0.00070;   // 後貨艙影響 (每公斤 +0.0007%)
+// --- 內部計算 ZFW CG (不寫入 DOM) ---
+function computeInternalZFWCG() {
+    const BASE_CG = 24.0;
+    const PAX_FACTOR = 0.00020;
+    const FWD_FACTOR = -0.00050;
+    const AFT_FACTOR = 0.00070;
 
-    // 取得當前重量 (KG)
     let paxWt = parseFloat(document.getElementById('pax-weight').value) || 0;
     let fwdWt = parseFloat(document.getElementById('cargo-fwd').value) || 0;
     let aftWt = parseFloat(document.getElementById('cargo-aft').value) || 0;
 
-    // 計算預估 CG
     let cg = BASE_CG + (paxWt * PAX_FACTOR) + (fwdWt * FWD_FACTOR) + (aftWt * AFT_FACTOR);
 
-    // 安全限制 (18% ~ 42%)
     if (cg < 18) cg = 18;
     if (cg > 42) cg = 42;
-
-    // 填入並存檔
-    document.getElementById('zfw-cg').value = cg.toFixed(1);
-    // 注意：不在此呼叫 saveInputs() 避免循環呼叫，saveInputs 會由 input 事件觸發
+    return cg;
 }
 
 function updatePaxWeight(){
     if(!window.weightDB) return;
     document.getElementById("pax-weight").value=(parseFloat(document.getElementById("pax-count").value)||0)*window.weightDB.pax_unit;
-    calculateZFWCG(); // 當乘客數變更時，重算 CG
 }
 
 function updateTotalCargo(){
     document.getElementById("cargo-total").value=(parseFloat(document.getElementById("cargo-fwd").value)||0)+(parseFloat(document.getElementById("cargo-aft").value)||0);
-    calculateZFWCG(); // 當貨物變更時，重算 CG
 }
 
 function interpolate(w, t) {
@@ -150,7 +137,6 @@ function interpolateVLS(w, t) {
     return 160;
 }
 
-// --- Trim 轉換輔助函數 ---
 function calculateTHS(cg) {
     let tp = window.perfDB.trim_physics;
     let val = (tp.ref_cg - cg) * tp.step; 
@@ -174,7 +160,7 @@ function convertToIF(degRaw) {
 }
 
 // ============================================
-// 🛫 起飛計算 (含 Trim)
+// 🛫 起飛計算 (含 TOW CG 顯示)
 // ============================================
 function calculateTakeoff() {
     if(!window.perfDB || !window.weightDB) return;
@@ -217,19 +203,23 @@ function calculateTakeoff() {
     if (isWet) v1 -= 6;
     if (v1 < 115) v1 = 115;
 
-    // --- TRIM 計算 ---
-    // 1. 取得 ZFW CG (現在是自動計算的)
-    let zfwCG = parseFloat(document.getElementById('zfw-cg').value) || 28.5;
-    // 2. 估算 TOW CG (燃油後移)
-    let towCG = zfwCG + 1.5; 
-    if(towCG > 38) towCG = 38;
+    // --- TOW CG 與 TRIM 計算 ---
+    // 1. 自動算出 ZFW CG
+    let zfwCG = computeInternalZFWCG();
+    
+    // 2. 計算 TOW CG (燃油影響)
+    // 燃油每KG移動係數讀取自 DB (預設 0.00004)
+    let fuelEffect = fuel * window.perfDB.trim_physics.fuel_cg_effect;
+    let towCG = zfwCG + fuelEffect;
+    if(towCG > 42) towCG = 42; // 安全上限
 
+    // 3. 計算 Trim
     let ths = calculateTHS(towCG);
     let ifTrim = convertToIF(ths.raw);
 
     // --- CRUISE TRIM 估算 ---
-    let crzCG = towCG + 3.0; 
-    if(crzCG > 40) crzCG = 40;
+    let crzCG = towCG + 3.0; // 模擬巡航重心後移
+    if(crzCG > 42) crzCG = 42;
     let crzTHS = calculateTHS(crzCG);
     let crzIF = convertToIF(crzTHS.raw);
     let trip = parseFloat(document.getElementById('trip-fuel').value)||0;
@@ -238,6 +228,9 @@ function calculateTakeoff() {
     // --- 輸出 ---
     document.getElementById('res-tow').innerText = Math.round(tow) + " KG";
     document.getElementById('res-tow').style.color = (tow > window.weightDB.limits.mtow) ? "#e74c3c" : "#fff";
+
+    // 顯示 TOW CG
+    document.getElementById('res-tow-cg').innerText = towCG.toFixed(1) + "%";
 
     document.getElementById('res-conf').innerText = conf;
     let flexEl = document.getElementById('res-flex');
@@ -260,7 +253,7 @@ function calculateTakeoff() {
 }
 
 // ============================================
-// 🛬 降落計算 (含 Trim)
+// 🛬 降落計算
 // ============================================
 function calculateLanding() {
     if(!window.perfDB || !window.weightDB) return;
@@ -302,8 +295,8 @@ function calculateLanding() {
     let vapp = Math.round(vls + vrefAdd + windCorr);
 
     // --- Landing Trim ---
-    let zfwCG = parseFloat(document.getElementById('zfw-cg').value) || 28.5;
-    let ldgCG = zfwCG - 1.0; 
+    let zfwCG = computeInternalZFWCG();
+    let ldgCG = zfwCG - 0.5; // 假設燃油耗盡，重心稍微前移回歸 ZFW
     let ldgTHS = calculateTHS(ldgCG);
     let ldgIF = convertToIF(ldgTHS.raw) + 5; 
     if(ldgIF > 100) ldgIF = 100;
@@ -325,7 +318,7 @@ function calculateLanding() {
 }
 
 function saveInputs() {
-    const ids = ['zfw-cg', 'pax-count','cargo-fwd','cargo-aft','fuel-total','trip-fuel',
+    const ids = ['pax-count','cargo-fwd','cargo-aft','fuel-total','trip-fuel',
                  'to-rwy-len','to-rwy-cond','to-wind-dir','to-wind-spd','to-rwy-hdg',
                  'ldg-rwy-len','ldg-rwy-cond','ldg-wind-dir','ldg-wind-spd','ldg-rwy-hdg',
                  'ldg-gw-input'];
@@ -333,11 +326,11 @@ function saveInputs() {
     ids.forEach(id => { let el=document.getElementById(id); if(el) data[id]=el.value; });
     data.title = document.getElementById('to-flight-title').innerText;
     data.desc = document.getElementById('ldg-flight-desc').innerText;
-    safeSet('tk_calc_inputs_v20', JSON.stringify(data));
+    safeSet('tk_calc_inputs_v21', JSON.stringify(data));
 }
 
 function loadInputs() {
-    const d = JSON.parse(safeGet('tk_calc_inputs_v20'));
+    const d = JSON.parse(safeGet('tk_calc_inputs_v21'));
     if(d) {
         for(let k in d) {
             let el = document.getElementById(k);
@@ -350,5 +343,5 @@ function loadInputs() {
 }
 
 function clearAllData() {
-    if(confirm("RESET ALL?")) { safeRem('tk_calc_inputs_v20'); safeRem('tk_roster_v20'); location.reload(); }
+    if(confirm("RESET ALL?")) { safeRem('tk_calc_inputs_v21'); safeRem('tk_roster_v21'); location.reload(); }
 }
