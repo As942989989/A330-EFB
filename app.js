@@ -1,11 +1,11 @@
 // ==========================================
-// 🧠 TK A330 EFB Core v18.0 (FT/KG Logic)
+// 🧠 TK A330 EFB Core v19.0 (Full Trim)
 // ==========================================
 
 function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function safeSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function safeRem(k){try{localStorage.removeItem(k)}catch(e){}}
-let completedFlights = JSON.parse(safeGet('tk_roster_v18')) || {};
+let completedFlights = JSON.parse(safeGet('tk_roster_v19')) || {};
 
 window.onload = function() {
     if (!window.flightDB || !window.perfDB || !window.weightDB || !window.airportDB) {
@@ -38,7 +38,7 @@ function renderRoster() {
 
 function toggle(k) {
     if(completedFlights[k]) delete completedFlights[k]; else completedFlights[k]=true;
-    safeSet('tk_roster_v18', JSON.stringify(completedFlights));
+    safeSet('tk_roster_v19', JSON.stringify(completedFlights));
     renderRoster();
 }
 
@@ -47,6 +47,8 @@ function loadFlight(k) {
     document.getElementById('pax-count').value = d.pax;
     document.getElementById('cargo-fwd').value = d.f;
     document.getElementById('cargo-aft').value = d.a;
+    // 預設 ZFW CG
+    document.getElementById('zfw-cg').value = 28.5;
     
     document.getElementById('to-flight-title').innerText = k + " (" + d.r + ")";
     document.getElementById('ldg-flight-desc').innerText = k + " (" + d.r + ")";
@@ -69,7 +71,6 @@ function populateRunways(selectId, icao) {
         for (const [rwyID, data] of Object.entries(apt.runways)) {
             let opt = document.createElement('option');
             opt.value = rwyID; 
-            // 顯示為 FT
             opt.innerText = `${rwyID} (${data.len}ft)`;
             opt.dataset.len = data.len;
             opt.dataset.hdg = data.hdg;
@@ -90,7 +91,6 @@ function applyRunway(prefix) {
 
 function updatePaxWeight(){
     if(!window.weightDB) return;
-    // 使用 weightDB 裡的 44
     document.getElementById("pax-weight").value=(parseFloat(document.getElementById("pax-count").value)||0)*window.weightDB.pax_unit;
 }
 function updateTotalCargo(){document.getElementById("cargo-total").value=(parseFloat(document.getElementById("cargo-fwd").value)||0)+(parseFloat(document.getElementById("cargo-aft").value)||0);}
@@ -115,8 +115,43 @@ function interpolateVLS(w, t) {
     return 160;
 }
 
+// --- Trim 轉換輔助函數 ---
+// 輸入: CG (%), 輸出: THS Degree (如 "UP 1.5")
+function calculateTHS(cg) {
+    let tp = window.perfDB.trim_physics;
+    let val = (tp.ref_cg - cg) * tp.step; 
+    // < 0 = DN, > 0 = UP
+    let dir = (val >= 0) ? "UP " : "DN ";
+    return {
+        deg: Math.abs(val),
+        text: dir + Math.abs(val).toFixed(1),
+        raw: val // 原始值(帶正負)
+    };
+}
+
+// 輸入: THS Degree (帶正負), 輸出: IF Percent (0-100%)
+function convertToIF(degRaw) {
+    let tp = window.perfDB.trim_physics;
+    // 公式: Percent = (Deg + Bias) * Factor
+    // 簡單線性轉換：模擬飛行中 Trim 0% 對應 DN 2度左右，50% 對應 UP 4度左右
+    let pct = (degRaw + tp.deg_to_pct_bias) / 100 * tp.deg_to_pct_factor * 100 / 3; 
+    // 修正公式: IF 20% ~ UP 0.5, IF 40% ~ UP 3.5
+    // 重新校準: 
+    // UP 0.0 (CG 29) -> IF 15%
+    // UP 3.0 (CG 24) -> IF 45%
+    // 關係: Pct = 15 + (Deg_UP * 10)
+    
+    let result = 15; // Base (Trim 0)
+    if(degRaw > 0) { // UP
+        result = 15 + (degRaw * 8); 
+    } else { // DN
+        result = 15 - (Math.abs(degRaw) * 8);
+    }
+    return Math.max(0, Math.min(100, Math.round(result)));
+}
+
 // ============================================
-// 🛫 起飛計算 (全英呎 FT / 全公斤 KG)
+// 🛫 起飛計算 (含 Trim)
 // ============================================
 function calculateTakeoff() {
     if(!window.perfDB || !window.weightDB) return;
@@ -125,10 +160,10 @@ function calculateTakeoff() {
     let pax = parseFloat(document.getElementById('pax-weight').value)||0;
     let cgo = parseFloat(document.getElementById('cargo-total').value)||0;
     let fuel = parseFloat(document.getElementById('fuel-total').value)||0;
-    
-    let tow = oew + pax + cgo + fuel; // KG
+    let tow = oew + pax + cgo + fuel; 
 
-    let len = parseFloat(document.getElementById('to-rwy-len').value)||10000; // 預設 10000ft
+    // 環境
+    let len = parseFloat(document.getElementById('to-rwy-len').value)||10000;
     let isWet = document.getElementById('to-rwy-cond').value === 'WET';
     let wdir = parseFloat(document.getElementById('to-wind-dir').value)||0;
     let wspd = parseFloat(document.getElementById('to-wind-spd').value)||0;
@@ -136,26 +171,16 @@ function calculateTakeoff() {
     let hw = Math.cos(Math.abs(rhdg-wdir)*(Math.PI/180))*wspd;
     let tw = (hw < 0) ? Math.abs(hw) : 0;
 
-    // --- 決策邏輯 (使用英呎標準) ---
-    // 壓力係數: KG / FT. 臨界值約 25 (原本80 KG/m)
+    // --- 決策 ---
     let stress = tow / len; 
-    
     let conf = "1+F";
-    // 短跑道判斷: < 8000ft (約2400m)
-    if (len < 8000 || tow > 235000 || stress > 25) {
-        conf = "2";
-    }
+    if (len < 8000 || tow > 235000 || stress > 25) conf = "2";
 
     let fd = window.perfDB.flex_data;
-    // Flex: (len - 8200) -> 8200ft (約2500m) 為基準
     let calcFlex = fd.base_temp + (fd.mtow - tow)*fd.slope_weight + Math.max(0, (len-8200)*fd.slope_runway) + Math.max(0, hw*0.5);
     let flex = Math.floor(calcFlex);
 
-    // TOGA 判斷
-    if (len < 7200) flex = "TOGA";      // 極短 (<2200m)
-    if (isWet && len < 8500) flex = "TOGA"; // 濕滑 (<2600m)
-    if (tw > 10) flex = "TOGA";
-    if (tow > 240000) flex = "TOGA";
+    if (len < 7200 || (isWet && len < 8500) || tw > 10 || tow > 240000) flex = "TOGA";
     if (flex > fd.max_temp) flex = fd.max_temp;
     if (flex < 45 && flex !== "TOGA") flex = "TOGA";
 
@@ -165,15 +190,31 @@ function calculateTakeoff() {
     let v1 = spd.v1 + corr.v1;
     let vr = spd.vr + corr.vr;
     let v2 = spd.v2 + corr.v2;
-
-    // V1 修正 (英呎邏輯)
     if (len < 7200) v1 -= 5;
     if (isWet) v1 -= 6;
     if (v1 < 115) v1 = 115;
 
-    let trimVal = (window.perfDB.trim_data.ref_cg - 28.5) * window.perfDB.trim_data.step;
-    let trimStr = (trimVal >= 0 ? "UP " : "DN ") + Math.abs(trimVal).toFixed(1);
+    // --- TRIM 計算 ---
+    // 1. 取得 ZFW CG
+    let zfwCG = parseFloat(document.getElementById('zfw-cg').value) || 28.5;
+    // 2. 估算 TOW CG (燃油通常讓 CG 後移)
+    // 假設起飛時燃油滿載，重心會往後約 2-3%
+    let towCG = zfwCG + 1.5; 
+    if(towCG > 38) towCG = 38; // 限制
 
+    let ths = calculateTHS(towCG);
+    let ifTrim = convertToIF(ths.raw);
+
+    // --- CRUISE TRIM 估算 ---
+    // 巡航時重心會更往後 (Trim Tank)，假設 35%~38%
+    let crzCG = towCG + 3.0; 
+    if(crzCG > 40) crzCG = 40;
+    let crzTHS = calculateTHS(crzCG);
+    let crzIF = convertToIF(crzTHS.raw);
+    let trip = parseFloat(document.getElementById('trip-fuel').value)||0;
+    let crzGW = tow - (trip * 0.5); // 航程中段重量
+
+    // --- 輸出 ---
     document.getElementById('res-tow').innerText = Math.round(tow) + " KG";
     document.getElementById('res-tow').style.color = (tow > window.weightDB.limits.mtow) ? "#e74c3c" : "#fff";
 
@@ -182,19 +223,26 @@ function calculateTakeoff() {
     flexEl.innerText = (flex === "TOGA") ? "TOGA" : flex + "°";
     flexEl.style.color = (flex === "TOGA") ? "#e74c3c" : "#00bfff";
 
-    document.getElementById('res-trim').innerText = trimStr;
+    // 顯示: UP 1.5 (25%)
+    document.getElementById('res-trim').innerText = `${ths.text} (${ifTrim}%)`;
+    
     document.getElementById('res-v1').innerText = Math.round(v1);
     document.getElementById('res-vr').innerText = Math.round(vr);
     document.getElementById('res-v2').innerText = Math.round(v2);
     
-    let trip = parseFloat(document.getElementById('trip-fuel').value)||0;
+    // Cruise Data
+    document.getElementById('res-crz-trim').innerText = crzTHS.text;
+    document.getElementById('res-crz-trim-pct').innerText = crzIF + "%";
+    document.getElementById('res-crz-gw').innerText = Math.round(crzGW/1000) + "T";
+
+    // Auto-fill Landing GW
     document.getElementById('ldg-gw-input').value = Math.round(tow - trip);
 
     saveInputs();
 }
 
 // ============================================
-// 🛬 降落計算 (全英呎 FT / 全公斤 KG)
+// 🛬 降落計算 (含 Trim)
 // ============================================
 function calculateLanding() {
     if(!window.perfDB || !window.weightDB) return;
@@ -226,15 +274,23 @@ function calculateLanding() {
         vrefAdd = window.perfDB.landing_conf3_add;
     }
 
-    // Auto Brake 邏輯 (英呎版)
     let ab = "LO";
-    if (len < 8200) ab = "MED"; // < 2500m
+    if (len < 8200) ab = "MED"; 
     if (isWet) ab = "MED";
-    if (len < 6200) ab = "MAX"; // < 1900m
+    if (len < 6200) ab = "MAX"; 
 
     let vls = interpolateVLS(ldw, window.perfDB.landing_vls_full);
     let windCorr = Math.max(5, Math.min(15, hw / 3));
     let vapp = Math.round(vls + vrefAdd + windCorr);
+
+    // --- Landing Trim ---
+    // 降落時重心通常比較前面 (Fwd)，因為 Trim Tank 油用完了
+    let zfwCG = parseFloat(document.getElementById('zfw-cg').value) || 28.5;
+    let ldgCG = zfwCG - 1.0; // 稍微前移
+    let ldgTHS = calculateTHS(ldgCG);
+    // IF 降落時通常 Trim 稍微高一點來幫助 Flare
+    let ldgIF = convertToIF(ldgTHS.raw) + 5; 
+    if(ldgIF > 100) ldgIF = 100;
 
     document.getElementById('res-ldw').innerText = Math.round(ldw) + " KG";
     document.getElementById('res-ldw').style.color = (ldw > window.weightDB.limits.mlw) ? "#e74c3c" : "#fff";
@@ -246,11 +302,14 @@ function calculateLanding() {
     document.getElementById('res-vapp').innerText = vapp;
     document.getElementById('res-autobrake').innerText = ab;
     
+    document.getElementById('res-ldg-trim').innerText = ldgTHS.text;
+    document.getElementById('res-ldg-trim-pct').innerText = ldgIF + "%";
+    
     saveInputs();
 }
 
 function saveInputs() {
-    const ids = ['pax-count','cargo-fwd','cargo-aft','fuel-total','trip-fuel',
+    const ids = ['zfw-cg', 'pax-count','cargo-fwd','cargo-aft','fuel-total','trip-fuel',
                  'to-rwy-len','to-rwy-cond','to-wind-dir','to-wind-spd','to-rwy-hdg',
                  'ldg-rwy-len','ldg-rwy-cond','ldg-wind-dir','ldg-wind-spd','ldg-rwy-hdg',
                  'ldg-gw-input'];
@@ -258,11 +317,11 @@ function saveInputs() {
     ids.forEach(id => { let el=document.getElementById(id); if(el) data[id]=el.value; });
     data.title = document.getElementById('to-flight-title').innerText;
     data.desc = document.getElementById('ldg-flight-desc').innerText;
-    safeSet('tk_calc_inputs_v18', JSON.stringify(data));
+    safeSet('tk_calc_inputs_v19', JSON.stringify(data));
 }
 
 function loadInputs() {
-    const d = JSON.parse(safeGet('tk_calc_inputs_v18'));
+    const d = JSON.parse(safeGet('tk_calc_inputs_v19'));
     if(d) {
         for(let k in d) {
             let el = document.getElementById(k);
@@ -275,5 +334,5 @@ function loadInputs() {
 }
 
 function clearAllData() {
-    if(confirm("RESET ALL?")) { safeRem('tk_calc_inputs_v18'); safeRem('tk_roster_v18'); location.reload(); }
+    if(confirm("RESET ALL?")) { safeRem('tk_calc_inputs_v19'); safeRem('tk_roster_v19'); location.reload(); }
 }
