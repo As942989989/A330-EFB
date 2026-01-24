@@ -5,9 +5,8 @@ function safeRem(k){try{localStorage.removeItem(k)}catch(e){}}
 let completedFlights = JSON.parse(safeGet('tk_roster_v16')) || {};
 
 window.onload = function() {
-    // 檢查完整性
     if (!window.flightDB || !window.perfDB || !window.weightDB || !window.airportDB) {
-        alert("⚠️ DB Error!\nEnsure roster, perf_db, weights, and airports.js are loaded.");
+        alert("⚠️ DB Error!\nMissing roster/perf/weights/airports js files.");
     } else {
         renderRoster();
     }
@@ -40,47 +39,33 @@ function toggle(k) {
     renderRoster();
 }
 
-// --- 載入航班核心 (含自動機場識別) ---
 function loadFlight(k) {
     const d = window.flightDB[k];
-    
-    // 填入基礎載重
     document.getElementById('pax-count').value = d.pax;
     document.getElementById('cargo-fwd').value = d.f;
     document.getElementById('cargo-aft').value = d.a;
-    
-    // 更新標題
     document.getElementById('to-flight-title').innerText = k + " (" + d.r + ")";
     document.getElementById('ldg-flight-desc').innerText = k + " (" + d.r + ")";
 
-    // [新功能] 解析機場代碼 (例如 "LTFM-EGLL")
-    let route = d.r.toUpperCase(); // 確保大寫
+    let route = d.r.toUpperCase(); 
     let dep = route.split('-')[0].trim();
     let arr = route.split('-')[1].trim();
 
-    // 呼叫跑道填入功能
     populateRunways('to-rwy-select', dep);
     populateRunways('ldg-rwy-select', arr);
 
-    updatePaxWeight(); 
-    updateTotalCargo(); 
-    saveInputs(); 
-    switchTab('takeoff');
+    updatePaxWeight(); updateTotalCargo(); saveInputs(); switchTab('takeoff');
 }
 
-// --- [新功能] 自動填入跑道清單 ---
 function populateRunways(selectId, icao) {
     const sel = document.getElementById(selectId);
-    sel.innerHTML = '<option value="">MANUAL INPUT</option>'; // 重置
-    
+    sel.innerHTML = '<option value="">MANUAL INPUT</option>'; 
     if (window.airportDB && window.airportDB[icao]) {
         const apt = window.airportDB[icao];
-        // 遍歷該機場所有跑道
         for (const [rwyID, data] of Object.entries(apt.runways)) {
             let opt = document.createElement('option');
-            opt.value = rwyID; // 存跑道號 (如 "35L")
-            opt.innerText = `${rwyID} (${data.len}m)`;
-            // 存數據在 dataset 方便讀取
+            opt.value = rwyID; 
+            opt.innerText = `${rwyID} (${data.len} ft)`; // 顯示英呎
             opt.dataset.len = data.len;
             opt.dataset.hdg = data.hdg;
             sel.appendChild(opt);
@@ -88,17 +73,12 @@ function populateRunways(selectId, icao) {
     }
 }
 
-// --- [新功能] 當使用者選擇跑道時，自動填入輸入框 ---
 function applyRunway(prefix) {
-    // prefix 是 'to' 或 'ldg'
     const sel = document.getElementById(prefix + '-rwy-select');
     const opt = sel.options[sel.selectedIndex];
-    
     if (opt.value !== "") {
         document.getElementById(prefix + '-rwy-len').value = opt.dataset.len;
         document.getElementById(prefix + '-rwy-hdg').value = opt.dataset.hdg;
-    } else {
-        // 如果選回 Manual，清空或是保留原值? 這裡選擇不清空以免誤刪
     }
     saveInputs();
 }
@@ -129,29 +109,40 @@ function interpolateVLS(w, t) {
     return 160;
 }
 
-// --- 起飛計算 ---
+// --- 起飛計算 (Feet 版本) ---
 function calculateTakeoff() {
     if(!window.perfDB || !window.weightDB) return;
     let oew = window.weightDB.oew; 
     let pax=parseFloat(document.getElementById('pax-weight').value)||0, cgo=parseFloat(document.getElementById('cargo-total').value)||0, fuel=parseFloat(document.getElementById('fuel-total').value)||0;
     let tow = (oew+pax+cgo+fuel)/1000;
 
-    let len=parseFloat(document.getElementById('to-rwy-len').value)||3000, wet=document.getElementById('to-rwy-cond').value==='WET';
+    let len=parseFloat(document.getElementById('to-rwy-len').value)||10000; // 預設 10000ft
+    let wet=document.getElementById('to-rwy-cond').value==='WET';
     let wdir=parseFloat(document.getElementById('to-wind-dir').value)||0, wspd=parseFloat(document.getElementById('to-wind-spd').value)||0, hdg=parseFloat(document.getElementById('to-rwy-hdg').value)||0;
     let hw = Math.cos(Math.abs(hdg-wdir)*(Math.PI/180))*wspd;
 
     let spd = interpolate(tow, window.perfDB.takeoff_speeds);
-    let conf = (len<2400||tow>230)?"2":"1+F";
+    
+    // [修正] Conf 2 門檻：8000ft (約 2400m)
+    let conf = (len<8000||tow>230)?"2":"1+F";
     let corr = window.perfDB.conf_correction[conf] || {v1:0,vr:0,v2:0};
     
     let v1=spd.v1+corr.v1, vr=spd.vr+corr.vr, v2=spd.v2+corr.v2;
-    if(len<2200) v1-=4;
+    
+    // [修正] V1 修正門檻：7200ft (約 2200m)
+    if(len<7200) v1-=4;
     if(wet) v1-=2;
 
     let fd=window.perfDB.flex_data;
-    let flex=Math.floor(fd.base_temp+(fd.mtow-tow)*fd.slope_weight+Math.max(0,(len-2500)*fd.slope_runway)+Math.max(0,hw*0.5));
+    // [修正] Flex 跑道獎勵：每多 1ft 獎勵 0.003度 (因為原本是每 100m=1度, 1m=0.01度 -> 1ft=0.003度)
+    // 基準長度 8200ft (約 2500m)
+    let rwyReward = Math.max(0, (len - 8200) * 0.003);
+    
+    let flex=Math.floor(fd.base_temp+(fd.mtow-tow)*fd.slope_weight + rwyReward + Math.max(0,hw*0.5));
     if(flex>fd.max_temp) flex=fd.max_temp;
-    if(len<2000||(wet&&len<2400)) flex="TOGA";
+    
+    // [修正] TOGA 門檻：6600ft (約 2000m) 或 濕地且<8000ft
+    if(len<6600||(wet&&len<8000)) flex="TOGA";
 
     let trimVal=(window.perfDB.trim_data.ref_cg-28.5)*window.perfDB.trim_data.step;
     let trimStr=(trimVal>=0?"UP ":"DN ")+Math.abs(trimVal).toFixed(1);
@@ -167,7 +158,6 @@ function calculateTakeoff() {
     document.getElementById('res-vr').innerText=Math.round(vr);
     document.getElementById('res-v2').innerText=Math.round(v2);
     
-    // [更新] 自動填入降落頁面的預設重量 (TOW - Trip Fuel)
     let trip = parseFloat(document.getElementById('trip-fuel').value)||0;
     let estLdw = tow - (trip/1000);
     document.getElementById('ldg-gw-input').value = estLdw.toFixed(1);
@@ -175,28 +165,28 @@ function calculateTakeoff() {
     saveInputs();
 }
 
-// --- 降落計算 ---
+// --- 降落計算 (Feet 版本) ---
 function calculateLanding() {
     if(!window.perfDB || !window.weightDB) return;
     
-    // [更新] 直接讀取手動輸入的重量 (Tons)
     let ldw = parseFloat(document.getElementById('ldg-gw-input').value);
-    
-    // 如果使用者沒輸入，嘗試自己算
     if(!ldw) {
         let oew = window.weightDB.oew;
         let pax=parseFloat(document.getElementById('pax-weight').value)||0, cgo=parseFloat(document.getElementById('cargo-total').value)||0, fuel=parseFloat(document.getElementById('fuel-total').value)||0, trip=parseFloat(document.getElementById('trip-fuel').value)||0;
         ldw = ((oew+pax+cgo+fuel) - trip)/1000;
-        document.getElementById('ldg-gw-input').value = ldw.toFixed(1); // 回填
+        document.getElementById('ldg-gw-input').value = ldw.toFixed(1);
     }
 
-    let len=parseFloat(document.getElementById('ldg-rwy-len').value)||3000, wet=document.getElementById('ldg-rwy-cond').value==='WET';
+    let len=parseFloat(document.getElementById('ldg-rwy-len').value)||10000;
+    let wet=document.getElementById('ldg-rwy-cond').value==='WET';
     let wdir=parseFloat(document.getElementById('ldg-wind-dir').value)||0, wspd=parseFloat(document.getElementById('ldg-wind-spd').value)||0, hdg=parseFloat(document.getElementById('ldg-rwy-hdg').value)||0;
     let hw = Math.cos(Math.abs(hdg-wdir)*(Math.PI/180))*wspd;
 
     let vls = interpolateVLS(ldw, window.perfDB.landing_vls_full);
     let vapp = Math.round(vls + Math.max(5, Math.min(15, hw/3)));
-    let ab = (len<2400||wet)?"MED":"LO";
+    
+    // [修正] Autobrake 門檻：8000ft
+    let ab = (len<8000||wet)?"MED":"LO";
 
     document.getElementById('res-ldw').innerText=ldw.toFixed(1)+" T";
     if(ldw*1000 > window.weightDB.limits.mlw) document.getElementById('res-ldw').style.color = "#e74c3c";
@@ -212,7 +202,7 @@ function saveInputs() {
     const ids = ['pax-count','cargo-fwd','cargo-aft','fuel-total','trip-fuel',
                  'to-rwy-len','to-rwy-cond','to-wind-dir','to-wind-spd','to-rwy-hdg',
                  'ldg-rwy-len','ldg-rwy-cond','ldg-wind-dir','ldg-wind-spd','ldg-rwy-hdg',
-                 'ldg-gw-input']; // 新增 ldg-gw-input
+                 'ldg-gw-input'];
     let data = {};
     ids.forEach(id => { let el=document.getElementById(id); if(el) data[id]=el.value; });
     data.title = document.getElementById('to-flight-title').innerText;
