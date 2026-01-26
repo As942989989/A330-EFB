@@ -5,12 +5,12 @@
 window.weightDB = {
     // --- 基礎重量 (單位: KG) ---
     oew: 129855,        // 空機重量 (Operating Empty Weight)
-    pax_unit: 44,       // 單一乘客標準重量 (含手提行李) [保持原設定]
+    pax_unit: 77,       // [Sim] 模擬器標準 (33900/441 ≈ 77kg)
     
     // --- 結構限制 (用於顯示警告) ---
     limits: {
-        mtow: 242000,   // 最大起飛重 (Max Takeoff Weight)
-        mlw: 185000,    // [Updated] 最大落地重 (原 182000)
-        mzfw: 183711    // [Updated] 最大零油重 (原 175000)
+        mtow: 242000,   // [Real] 最大起飛重 (Max Takeoff Weight)
+        mlw: 185000,    // [Sim] 最大落地重 (高運量構型)
+        mzfw: 175000    // [Real] 最大零油重 (真實結構限制) - 嚴格模式
     }
 };
