@@ -37,6 +37,9 @@ input, select { width: 55%; background-color: #000; border: 1px solid #444; colo
 .btn-calc { width: 100%; padding: 15px; background-color: #e30a17; color: #fff; border: none; font-size: 16px; font-weight: bold; margin-top: 20px; border-radius: 6px; }
 .result-box { background-color: #111; border: 1px solid #333; border-radius: 8px; padding: 15px; margin-top: 15px; }
 
+/* [v26.2 New] 資訊顯示列 (唯讀模式) */
+.rwy-info-row { display: flex; justify-content: space-between; align-items: center; background: #111; padding: 8px; border-radius: 4px; margin-bottom: 10px; border: 1px solid #333; font-size: 11px; color: #888; font-family: monospace; }
+
 /* 數據顯示格 */
 .perf-section { background: #1a1a1a; padding: 10px; border-radius: 6px; margin-top: 10px; border: 1px solid #333; }
 .perf-title { font-size: 11px; color: #aaa; margin-bottom: 5px; text-align: center; border-bottom: 1px solid #333; padding-bottom: 3px; }
