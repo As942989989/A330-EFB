@@ -164,7 +164,20 @@ function computeInternalZFWCG() {
 
 function updatePaxWeight(){
     if(!window.weightDB) return;
-    document.getElementById("pax-weight").value=(parseFloat(document.getElementById("pax-count").value)||0)*window.weightDB.pax_unit;
+    
+    // 1. 取得人數與單重
+    let count = parseFloat(document.getElementById("pax-count").value) || 0;
+    let unit = window.weightDB.pax_unit; // 77kg
+    let totalWeight = count * unit;
+
+    // 2. 更新隱藏欄位 (給計算公式用)
+    document.getElementById("pax-weight").value = totalWeight;
+
+    // 3. [新增] 更新 UI 顯示文字
+    let dispEl = document.getElementById("pax-weight-disp");
+    if(dispEl) {
+        dispEl.innerText = totalWeight;
+    }
 }
 
 function updateTotalCargo(){
