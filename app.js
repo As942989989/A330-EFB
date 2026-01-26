@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 A330-300 EFB Core v26.1 (MCDU Physics + High Temp Fix)
+// 🧠 A330-300 EFB Core v26.2 (UI Polish & Flexibility)
 // ==========================================
 
 function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
@@ -23,11 +23,13 @@ function switchTab(t) {
     document.getElementById('btn-' + t).classList.add('active');
 }
 
+// [v26.2] 班表顯示優化：增加 CI 與 總貨重
 function renderRoster() {
     const list = document.getElementById('roster-list');
     list.innerHTML = '';
     if(!window.flightDB) return;
     for (const [k, v] of Object.entries(window.flightDB)) {
+        const totalCargo = (v.f || 0) + (v.a || 0); // 計算總貨重
         const d = document.createElement('div');
         d.className = `flight-card ${completedFlights[k]?'completed':''}`;
         d.onclick = (e) => { if(!e.target.classList.contains('check-btn')) loadFlight(k); };
@@ -35,7 +37,12 @@ function renderRoster() {
             <div class="flight-info">
                 <div class="flight-day">${v.day} | ${k}</div>
                 <div class="flight-route">${v.r}</div>
-                <div style="font-size:11px; color:#00ff00; margin-bottom:4px; font-family:monospace;">Pax: ${v.pax} | Fwd: ${v.f} | Aft: ${v.a}</div>
+                <div style="font-size:12px; color:#00bfff; margin-bottom:4px; font-weight:bold;">
+                    CI: ${v.ci} | Total Cargo: ${totalCargo} KG
+                </div>
+                <div style="font-size:11px; color:#888; margin-bottom:4px; font-family:monospace;">
+                    Pax: ${v.pax} | Fwd: ${v.f} | Aft: ${v.a}
+                </div>
                 <div class="flight-desc">${v.d}</div>
             </div>
             <button class="check-btn" onclick="toggle('${k}')">✓</button>
@@ -62,7 +69,7 @@ function loadFlight(k) {
     let dep = route.split('-')[0].trim();
     let arr = route.split('-')[1].trim();
 
-    document.getElementById('to-oat').value = ""; // Force manual OAT
+    document.getElementById('to-oat').value = ""; 
 
     if(window.airportDB) {
         if(window.airportDB[dep]) document.getElementById('to-elev-disp').innerText = window.airportDB[dep].elev || 0;
@@ -71,6 +78,11 @@ function loadFlight(k) {
 
     populateRunways('to-rwy-select', dep);
     populateRunways('ldg-rwy-select', arr);
+    
+    // Reset to Manual Mode initially or handle defaults
+    applyRunway('to'); 
+    applyRunway('ldg');
+
     updatePaxWeight(); 
     updateTotalCargo(); 
     saveInputs(); 
@@ -88,26 +100,53 @@ function populateRunways(selectId, icao) {
             opt.innerText = `${rwyID} (${data.len}ft)`;
             opt.dataset.len = data.len;
             opt.dataset.hdg = data.hdg;
-            // [v26] Store Slope in dataset for Auto-fill
             opt.dataset.slope = data.slope !== undefined ? data.slope : 0;
             sel.appendChild(opt);
         }
     }
 }
 
+// [v26.2] 彈性跑道邏輯：切換「資訊顯示」與「手動輸入」
 function applyRunway(prefix) {
     const sel = document.getElementById(prefix + '-rwy-select');
     const opt = sel.options[sel.selectedIndex];
+    
+    // 取得介面區塊 (這些 ID 將在下一步生成的 HTML 中定義)
+    const manualDiv = document.getElementById(prefix + '-manual-data');
+    const infoDiv = document.getElementById(prefix + '-rwy-info');
+
     if (opt.value !== "") {
+        // === 資料庫模式 ===
+        // 1. 填入隱藏的輸入框數值 (為了讓計算邏輯讀取)
         document.getElementById(prefix + '-rwy-len').value = opt.dataset.len;
         document.getElementById(prefix + '-rwy-hdg').value = opt.dataset.hdg;
-        
-        // [v26 Auto-fill] 自動填入坡度 (如果欄位存在)
         let slopeInput = document.getElementById(prefix + '-rwy-slope');
-        if(slopeInput) {
-            slopeInput.value = opt.dataset.slope;
+        if(slopeInput) slopeInput.value = opt.dataset.slope;
+
+        // 2. 更新「小字資訊顯示區」
+        if(infoDiv) {
+            infoDiv.style.display = 'flex'; // 顯示資訊條
+            infoDiv.innerHTML = `
+                <div>LEN: <span style="color:#00bfff">${opt.dataset.len}</span> FT</div>
+                <div style="border-left:1px solid #444; margin:0 5px;"></div>
+                <div>HDG: <span style="color:#00bfff">${opt.dataset.hdg}°</span></div>
+                <div style="border-left:1px solid #444; margin:0 5px;"></div>
+                <div>SLOPE: <span style="color:#00bfff">${opt.dataset.slope}%</span></div>
+            `;
         }
+
+        // 3. 隱藏手動輸入框 (保持介面乾淨)
+        if(manualDiv) manualDiv.style.display = 'none';
+
+    } else {
+        // === 手動模式 (Flexibility) ===
+        // 1. 顯示手動輸入框，讓使用者自己打
+        if(manualDiv) manualDiv.style.display = 'block';
+        
+        // 2. 隱藏資訊顯示區
+        if(infoDiv) infoDiv.style.display = 'none';
     }
+    
     saveInputs();
 }
 
@@ -165,7 +204,6 @@ function convertToIF(degRaw) {
     return Math.max(0, Math.min(100, Math.round(result)));
 }
 
-// [v26] Green Dot
 function calculateGreenDot(weightTons) {
     return Math.round(0.6 * weightTons + 135);
 }
@@ -176,19 +214,14 @@ function calculateGreenDot(weightTons) {
 function calculateTakeoff() {
     if(!window.perfDB || !window.weightDB) return;
     
-    // 1. OAT 檢查
     let oatStr = document.getElementById('to-oat').value;
     if(oatStr === "" || oatStr === null) { alert("⚠️ Enter OAT"); return; }
     let oat = parseFloat(oatStr);
 
-    // 2. 獲取輸入 (含隱藏變數)
-    // [Physics] QNH=1013, Packs=ON, Anti-Ice=OFF (Default)
     let qnh = 1013;
     let slope = parseFloat(document.getElementById('to-rwy-slope').value) || 0;
-    // [Physics] 對正損失 60m (約200ft)
     let lineup = 60; 
 
-    // 3. 載重
     let oew = window.weightDB.oew; 
     let pax = parseFloat(document.getElementById('pax-weight').value)||0;
     let cgo = parseFloat(document.getElementById('cargo-total').value)||0;
@@ -196,28 +229,20 @@ function calculateTakeoff() {
     let tow = oew + pax + cgo + fuel; 
     let towTons = tow / 1000;
 
-    // 4. 有效跑道長度 (Effective TORA)
     let rwyLen = parseFloat(document.getElementById('to-rwy-len').value)||10000;
-    // [Physics] 上坡每 +1% 視為跑道物理縮短 8% (加速慢)
     let slopePenalty = (slope > 0) ? (rwyLen * slope * 0.08) : 0; 
-    // [Physics] 扣除 Line-Up (200ft)
     let effLen = rwyLen - 200 - slopePenalty;
 
     let isWet = document.getElementById('to-rwy-cond').value === 'WET';
     let elev = parseFloat(document.getElementById('to-elev-disp').innerText)||0; 
 
-    // 5. Flex & N1 物理運算 (修正版: 含高溫衰減)
+    // Flex & N1 物理運算 (含高溫衰減)
     let fd = window.perfDB.flex_data;
     let bp = window.perfDB.bleed_penalty;
-    
-    // [Physics] 固定扣除 Packs ON (0.8%)
     let bleedLoss = bp.packs_on; 
 
-    // 基礎 Flex (基於重量與跑道長度)
     let baseFlex = fd.base_temp + (fd.mtow - tow)*fd.slope_weight + Math.max(0, (effLen-8000)*fd.slope_runway);
     
-    // [v26 FIX] 加入氣溫對性能的懲罰 (Flat Rating Physics)
-    // 當 OAT 超過 T_REF (30度)，每高 1 度，性能餘裕就會減少，Flex 必須降低 (推力要增加)
     let tempPenalty = 0;
     if (oat > fd.t_ref) {
         tempPenalty = (oat - fd.t_ref) * fd.delta_t_penalty;
@@ -226,24 +251,19 @@ function calculateTakeoff() {
     let isa = 15 - (elev / 1000 * 2);
     let altPenalty = (elev / 1000) * fd.elev_penalty; 
     
-    // [v26 FIX] 將 tempPenalty 加入扣減公式
     let flex = Math.floor(baseFlex - altPenalty - tempPenalty);
 
-    // [Physics] 上坡 > 0.5% 強制 TOGA (加速太慢)
     if (flex <= oat) flex = "TOGA"; 
     else if (flex > fd.max_temp) flex = fd.max_temp;
     if (effLen < 6500 || slope > 0.5) flex = "TOGA";
 
-    // N1 計算
     let n1 = window.perfDB.n1_physics.base_n1; 
     if (flex !== "TOGA") {
         let deltaFlex = flex - oat;
         n1 -= (deltaFlex * window.perfDB.n1_physics.flex_correction);
     }
-    // [Physics] 扣除隱藏損耗 (Packs)
     n1 = n1 - bleedLoss;
 
-    // 6. V-Speeds 動態滑動
     let spd = interpolate(tow, window.perfDB.takeoff_speeds);
     let conf = "1+F";
     if (effLen < 7500 || tow > 235000) conf = "2";
@@ -253,17 +273,14 @@ function calculateTakeoff() {
     let vr = spd.vr + corr.vr;
     let v2 = spd.v2 + corr.v2;
 
-    // [Physics] 下坡 V1 懲罰 (煞車難)
     if (slope < 0) {
         v1 -= (Math.abs(slope) * window.perfDB.runway_physics.slope_v1_factor);
     }
-    // [Physics] 濕滑跑道 V1 懲罰
     if (isWet) v1 -= 8;
 
     if (v1 < 112) v1 = 112; 
     if (v1 > vr) v1 = vr;
 
-    // 7. 重心與其他
     let zfwCG = computeInternalZFWCG();
     let fuelEffect = fuel * window.perfDB.trim_physics.fuel_cg_effect;
     let towCG = zfwCG + fuelEffect;
@@ -272,7 +289,6 @@ function calculateTakeoff() {
     let ifTrim = convertToIF(ths.raw);
     let greenDot = calculateGreenDot(towTons);
 
-    // --- 輸出 ---
     document.getElementById('res-tow').innerText = Math.round(tow) + " KG";
     document.getElementById('res-tow').style.color = (tow > window.weightDB.limits.mtow) ? "#e74c3c" : "#fff";
     document.getElementById('res-conf').innerText = conf;
@@ -286,7 +302,6 @@ function calculateTakeoff() {
     document.getElementById('res-vr').innerText = Math.round(vr);
     document.getElementById('res-v2').innerText = Math.round(v2);
     
-    // [UI] 若 HTML 有 Green Dot 則顯示
     let gdEl = document.getElementById('res-green-dot');
     if(gdEl) gdEl.innerText = greenDot + " KT";
 
@@ -315,7 +330,6 @@ function calculateLanding() {
     let len = parseFloat(document.getElementById('ldg-rwy-len').value)||10000;
     let isWet = document.getElementById('ldg-rwy-cond').value === 'WET';
     let slope = parseFloat(document.getElementById('ldg-rwy-slope').value) || 0;
-    // [Physics] 取得反推設定 (若無 UI 則預設 IDLE)
     let revEl = document.getElementById('ldg-rev');
     let useMaxRev = (revEl && revEl.value === 'max');
     
@@ -334,22 +348,15 @@ function calculateLanding() {
         vrefAdd = window.perfDB.landing_conf3_add;
     }
 
-    // [Physics] Vapp 堆疊 (VLS + Wind)
-    // Anti-Ice 隱藏設定為 OFF -> IceCorr = 0
     let vls = interpolateVLS(ldw, window.perfDB.landing_vls_full);
     let windCorr = Math.max(5, Math.min(15, hw / 3)); 
     let vapp = Math.round(vls + vrefAdd + windCorr);
 
-    // [Physics] RLD 法規距離與 Autobrake
-    // 1. 基準距離 (ALD) 模擬
     let baseDist = 1500 * (ldw / 180000); 
-    // 2. 坡度修正 (下坡煞車距離增加 10% per 1%)
     if (slope < 0) baseDist *= (1 + (Math.abs(slope) * 0.10)); 
-    // 3. 反推修正 (僅影響濕地)
-    if (isWet && useMaxRev) baseDist *= 0.9; // Max Rev 優惠
-    if (isWet && !useMaxRev) baseDist *= 1.1; // Idle Rev 懲罰
+    if (isWet && useMaxRev) baseDist *= 0.9; 
+    if (isWet && !useMaxRev) baseDist *= 1.1; 
 
-    // 4. 計算 RLD (法規需求)
     let safetyFactor = isWet ? 1.92 : 1.67;
     let rld = baseDist * safetyFactor;
     
@@ -357,10 +364,8 @@ function calculateLanding() {
 
     let ab = "LO";
     if (margin < 2000 || isWet || slope < -0.5) ab = "MED";
-    // 餘裕過小強制 MAX
     if (margin < 500) ab = "MAX"; 
 
-    // [UI] 若 RLD 超過跑道，顯示警告
     let abEl = document.getElementById('res-autobrake');
     if (margin < 0) {
         abEl.innerText = "NO LND";
@@ -391,9 +396,9 @@ function calculateLanding() {
 function saveInputs() {
     const ids = ['pax-count','cargo-fwd','cargo-aft','fuel-total','trip-fuel',
                  'to-rwy-len','to-rwy-cond','to-wind-dir','to-wind-spd','to-rwy-hdg','to-oat',
-                 'to-rwy-slope', // Auto-filled
+                 'to-rwy-slope', 
                  'ldg-rwy-len','ldg-rwy-cond','ldg-wind-dir','ldg-wind-spd','ldg-rwy-hdg',
-                 'ldg-rwy-slope', 'ldg-rev', // Auto-filled / New
+                 'ldg-rwy-slope', 'ldg-rev', 
                  'ldg-gw-input'];
     let data = {};
     ids.forEach(id => { let el=document.getElementById(id); if(el) data[id]=el.value; });
@@ -412,6 +417,10 @@ function loadInputs() {
         if(d.title) document.getElementById('to-flight-title').innerText = d.title;
         if(d.desc) document.getElementById('ldg-flight-desc').innerText = d.desc;
         updatePaxWeight(); updateTotalCargo();
+        
+        // Ensure manual toggle state reflects loaded values
+        applyRunway('to');
+        applyRunway('ldg');
     }
 }
 
