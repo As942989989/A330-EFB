@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 A330-300 EFB Core v26.0 (MCDU Physics)
+// 🧠 A330-300 EFB Core v26.1 (MCDU Physics + High Temp Fix)
 // ==========================================
 
 function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
@@ -206,18 +206,28 @@ function calculateTakeoff() {
     let isWet = document.getElementById('to-rwy-cond').value === 'WET';
     let elev = parseFloat(document.getElementById('to-elev-disp').innerText)||0; 
 
-    // 5. Flex & N1 物理運算
+    // 5. Flex & N1 物理運算 (修正版: 含高溫衰減)
     let fd = window.perfDB.flex_data;
     let bp = window.perfDB.bleed_penalty;
     
     // [Physics] 固定扣除 Packs ON (0.8%)
     let bleedLoss = bp.packs_on; 
 
-    // 基礎 Flex
+    // 基礎 Flex (基於重量與跑道長度)
     let baseFlex = fd.base_temp + (fd.mtow - tow)*fd.slope_weight + Math.max(0, (effLen-8000)*fd.slope_runway);
+    
+    // [v26 FIX] 加入氣溫對性能的懲罰 (Flat Rating Physics)
+    // 當 OAT 超過 T_REF (30度)，每高 1 度，性能餘裕就會減少，Flex 必須降低 (推力要增加)
+    let tempPenalty = 0;
+    if (oat > fd.t_ref) {
+        tempPenalty = (oat - fd.t_ref) * fd.delta_t_penalty;
+    }
+
     let isa = 15 - (elev / 1000 * 2);
     let altPenalty = (elev / 1000) * fd.elev_penalty; 
-    let flex = Math.floor(baseFlex - altPenalty);
+    
+    // [v26 FIX] 將 tempPenalty 加入扣減公式
+    let flex = Math.floor(baseFlex - altPenalty - tempPenalty);
 
     // [Physics] 上坡 > 0.5% 強制 TOGA (加速太慢)
     if (flex <= oat) flex = "TOGA"; 
