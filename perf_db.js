@@ -1,10 +1,10 @@
 // ==========================================
-// ✈️ A330-300 (GE CF6) 性能資料庫 (KG/FT + Atmosphere + N1)
+// ✈️ A330-300 (GE CF6) Advanced Physics DB v26
 // ==========================================
 
 window.perfDB = {
     // --------------------------------------
-    // 1. 起飛速度表 (Takeoff Speeds) [KG]
+    // 1. 基準起飛速度 (Base V-Speeds) [KG]
     // --------------------------------------
     takeoff_speeds: [
         [130000, 122, 125, 130],
@@ -23,7 +23,7 @@ window.perfDB = {
     ],
 
     // --------------------------------------
-    // 2. 構型修正
+    // 2. 構型修正 (Config Correction)
     // --------------------------------------
     conf_correction: {
         "1+F": { v1: 0, vr: 0, v2: 0 },
@@ -49,7 +49,7 @@ window.perfDB = {
     landing_conf3_add: 4,
 
     // --------------------------------------
-    // 4. Flex 參數 (含大氣修正係數)
+    // 4. 推力與環境物理 (Thrust Physics)
     // --------------------------------------
     flex_data: {
         base_temp: 46,
@@ -58,11 +58,35 @@ window.perfDB = {
         slope_weight: 0.0006,
         slope_runway: 0.003,
         elev_penalty: 2.5,
-        delta_t_penalty: 0.5
+        delta_t_penalty: 0.5,
+        // [New] 物理修正係數
+        t_ref: 30,           // Flat Rating 轉折溫度
+        qnh_std: 1013,       // 標準氣壓
+        qnh_effect: 0.05,    // 每 1hPa 對推力(Flex)的影響
     },
 
     // --------------------------------------
-    // 5. Trim 物理模型
+    // 5. 系統損耗 (Hidden System Bleed Penalties)
+    // --------------------------------------
+    bleed_penalty: {
+        packs_on: 0.8,       // N1% 損失 (預設 ON)
+        ai_eng: 0.5,         // N1% 損失
+        ai_wing: 2.2         // N1% 損失 (Eng+Wing)
+    },
+
+    // --------------------------------------
+    // 6. 跑道物理 (Runway Physics) - 核心修正
+    // --------------------------------------
+    runway_physics: {
+        lua_full: 60,        // Line-Up Allowance (m)
+        slope_v1_factor: 3.5,// 每 1% 下坡 V1 減少 (kt)
+        slope_dist_factor: 0.10, // 每 1% 坡度對距離的影響 (10%)
+        wet_brake_factor: 1.15,  // 濕滑跑道煞車距離係數 (+15%)
+        rev_max_credit: 0.90     // Max Rev 濕地距離優惠 (90%)
+    },
+
+    // --------------------------------------
+    // 7. Trim 模型
     // --------------------------------------
     trim_physics: {
         ref_cg: 29.0,
@@ -73,18 +97,10 @@ window.perfDB = {
     },
 
     // --------------------------------------
-    // 6. 基礎物理常數
-    // --------------------------------------
-    atmosphere: {
-        isa_sea_level: 15,
-        temp_lapse: 2
-    },
-
-    // --------------------------------------
-    // 7. N1 引擎參數 (New)
+    // 8. N1 引擎模型
     // --------------------------------------
     n1_physics: {
-        base_n1: 98.2,       // 標準 TOGA N1 (%)
-        flex_correction: 0.22 // 每 1度 Flex 溫差 (Flex - OAT) 減少的 N1%
+        base_n1: 98.2,       // TOGA N1
+        flex_correction: 0.22 
     }
 };
