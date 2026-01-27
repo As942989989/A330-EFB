@@ -1,5 +1,5 @@
 // ==========================================
-// ✈️ A330-300 (GE CF6) Advanced Physics DB v26.3
+// ✈️ A330-300 (GE CF6) Advanced Physics DB v27.0 (OPT Logic Ready)
 // ==========================================
 
 window.perfDB = {
@@ -26,9 +26,9 @@ window.perfDB = {
     // 2. 構型修正 (Config Correction)
     // --------------------------------------
     conf_correction: {
-        "1+F": { v1: 0, vr: 0, v2: 0 },
-        "2":   { v1: -3, vr: -3, v2: -2 },
-        "3":   { v1: -6, vr: -6, v2: -5 }
+        "1+F": { v1: 0, vr: 0, v2: 0, dist_factor: 1.0 },    // 基準距離
+        "2":   { v1: -3, vr: -3, v2: -2, dist_factor: 0.92 }, // 更短起飛距離 (更多升力)
+        "3":   { v1: -6, vr: -6, v2: -5, dist_factor: 0.85 }  // 最短起飛距離
     },
 
     // --------------------------------------
@@ -46,43 +46,39 @@ window.perfDB = {
         [210000, 154],
         [230000, 162]
     ],
-    landing_conf3_add: 4,
+    landing_conf3_add: 5, // Conf 3 Vapp 增加量
 
     // --------------------------------------
     // 4. 推力與環境物理 (Thrust Physics)
     // --------------------------------------
     flex_data: {
-        base_temp: 46,
-        max_temp: 68,
-        mtow: 242000,
-        slope_weight: 0.0006,
-        slope_runway: 0.003,
-        elev_penalty: 2.5,
-        delta_t_penalty: 0.5,
-        // [New] 物理修正係數
-        t_ref: 30,           // Flat Rating 轉折溫度
-        qnh_std: 1013,       // 標準氣壓
-        qnh_effect: 0.05,    // 每 1hPa 對推力(Flex)的影響
+        base_temp: 46,       // Tref
+        max_temp: 68,        // Max Flex allowed
+        min_flex_margin: 0,  // Flex cannot be lower than OAT
+        
+        // Thrust Decay Model
+        // 每一度 Flex 造成的推力損失 (換算為距離懲罰)
+        flex_dist_penalty: 0.012, // 每增加1度Flex，距離增加 1.2%
     },
 
     // --------------------------------------
-    // 5. 系統損耗 (Hidden System Bleed Penalties)
+    // 5. 系統損耗
     // --------------------------------------
     bleed_penalty: {
-        packs_on: 0.8,       // N1% 損失 (預設 ON)
-        ai_eng: 0.5,         // N1% 損失
-        ai_wing: 2.2         // N1% 損失 (Eng+Wing)
+        packs_on: 0.8,
+        ai_eng: 0.5,
+        ai_wing: 2.2
     },
 
     // --------------------------------------
-    // 6. 跑道物理 (Runway Physics) - 核心修正
+    // 6. 跑道物理 (Runway Physics)
     // --------------------------------------
     runway_physics: {
-        lua_full: 60,        // Line-Up Allowance (m)
-        slope_v1_factor: 3.5,// 每 1% 下坡 V1 減少 (kt)
-        slope_dist_factor: 0.10, // 每 1% 坡度對距離的影響 (10%)
-        wet_brake_factor: 1.15,  // 濕滑跑道煞車距離係數 (+15%)
-        rev_max_credit: 0.90     // Max Rev 濕地距離優惠 (90%)
+        lua_full: 60,
+        slope_v1_factor: 3.5,
+        slope_dist_factor: 0.12, // 1% Slope 影響 12% 距離
+        wet_brake_factor: 1.15,
+        wet_toga_penalty: 0       // 濕地起飛距離懲罰 (Screen height 15ft vs 35ft offset)
     },
 
     // --------------------------------------
@@ -100,19 +96,39 @@ window.perfDB = {
     // 8. N1 引擎模型
     // --------------------------------------
     n1_physics: {
-        base_n1: 98.2,       // TOGA N1
+        base_n1: 98.2, // TOGA
         flex_correction: 0.22 
     },
 
     // --------------------------------------
-    // [New] 9. 距離估算模型 (Distance Calculation)
+    // 9. 距離估算模型 (Distance Calculation)
     // --------------------------------------
     dist_physics: {
-        // 起飛基準: 200噸, 海平面, ISA, TOGA
-        base_to_dist_ft: 5900,  // ~1800m
-        flex_penalty_factor: 0.005, // 每 1度 Flex 差距增加 0.5% 距離
+        // 起飛基準: 200噸, 海平面, ISA, TOGA, Conf 1+F
+        base_to_dist_ft: 5900,
         
         // 降落基準: 180噸, 海平面, ISA, CONF FULL, MAX BRAKE
-        base_ld_dist_ft: 4920   // ~1500m (ALD)
+        base_ld_dist_ft: 4920 
+    },
+
+    // --------------------------------------
+    // [New] 10. 降落減速模型 (Deceleration)
+    // --------------------------------------
+    decel_physics: {
+        // 相對於 MAX BRAKE 的距離係數
+        autobrake: {
+            "LO": 1.40,  // 距離最長
+            "MED": 1.15,
+            "MAX": 1.00  // 基準
+        },
+        conf3_penalty: 1.05, // Conf 3 雖然阻力小但地速快，且少一段 Flap 阻力
+        rev_credit: {
+            dry: 0.02, // 乾地反推影響小 (2%)
+            wet: 0.08  // 濕地反推影響大 (8%)
+        },
+        safety_margin: {
+            dry: 1.67, // 規章 RLD Dry
+            wet: 1.92  // 規章 RLD Wet (+15%)
+        }
     }
 };
