@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 A330-300 EFB Core v26.2 (UI Polish & Flexibility)
+// 🧠 A330-300 EFB Core v26.3 (Distance & FT Units)
 // ==========================================
 
 function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
@@ -23,7 +23,7 @@ function switchTab(t) {
     document.getElementById('btn-' + t).classList.add('active');
 }
 
-// [v26.2] 班表顯示優化：增加 CI 與 總貨重
+// [v26.2] 班表顯示優化
 function renderRoster() {
     const list = document.getElementById('roster-list');
     list.innerHTML = '';
@@ -106,26 +106,21 @@ function populateRunways(selectId, icao) {
     }
 }
 
-// [v26.2] 彈性跑道邏輯：切換「資訊顯示」與「手動輸入」
 function applyRunway(prefix) {
     const sel = document.getElementById(prefix + '-rwy-select');
     const opt = sel.options[sel.selectedIndex];
     
-    // 取得介面區塊 (這些 ID 將在下一步生成的 HTML 中定義)
     const manualDiv = document.getElementById(prefix + '-manual-data');
     const infoDiv = document.getElementById(prefix + '-rwy-info');
 
     if (opt.value !== "") {
-        // === 資料庫模式 ===
-        // 1. 填入隱藏的輸入框數值 (為了讓計算邏輯讀取)
         document.getElementById(prefix + '-rwy-len').value = opt.dataset.len;
         document.getElementById(prefix + '-rwy-hdg').value = opt.dataset.hdg;
         let slopeInput = document.getElementById(prefix + '-rwy-slope');
         if(slopeInput) slopeInput.value = opt.dataset.slope;
 
-        // 2. 更新「小字資訊顯示區」
         if(infoDiv) {
-            infoDiv.style.display = 'flex'; // 顯示資訊條
+            infoDiv.style.display = 'flex'; 
             infoDiv.innerHTML = `
                 <div>LEN: <span style="color:#00bfff">${opt.dataset.len}</span> FT</div>
                 <div style="border-left:1px solid #444; margin:0 5px;"></div>
@@ -134,16 +129,10 @@ function applyRunway(prefix) {
                 <div>SLOPE: <span style="color:#00bfff">${opt.dataset.slope}%</span></div>
             `;
         }
-
-        // 3. 隱藏手動輸入框 (保持介面乾淨)
         if(manualDiv) manualDiv.style.display = 'none';
 
     } else {
-        // === 手動模式 (Flexibility) ===
-        // 1. 顯示手動輸入框，讓使用者自己打
         if(manualDiv) manualDiv.style.display = 'block';
-        
-        // 2. 隱藏資訊顯示區
         if(infoDiv) infoDiv.style.display = 'none';
     }
     
@@ -164,16 +153,10 @@ function computeInternalZFWCG() {
 
 function updatePaxWeight(){
     if(!window.weightDB) return;
-    
-    // 1. 取得人數與單重
     let count = parseFloat(document.getElementById("pax-count").value) || 0;
-    let unit = window.weightDB.pax_unit; // 77kg
+    let unit = window.weightDB.pax_unit; 
     let totalWeight = count * unit;
-
-    // 2. 更新隱藏欄位 (給計算公式用)
     document.getElementById("pax-weight").value = totalWeight;
-
-    // 3. [新增] 更新 UI 顯示文字
     let dispEl = document.getElementById("pax-weight-disp");
     if(dispEl) {
         dispEl.innerText = totalWeight;
@@ -222,7 +205,7 @@ function calculateGreenDot(weightTons) {
 }
 
 // ============================================
-// 🛫 MCDU 級起飛計算 (v26 Physics)
+// 🛫 MCDU 級起飛計算 (v26.3 Physics + TOD)
 // ============================================
 function calculateTakeoff() {
     if(!window.perfDB || !window.weightDB) return;
@@ -233,8 +216,7 @@ function calculateTakeoff() {
 
     let qnh = 1013;
     let slope = parseFloat(document.getElementById('to-rwy-slope').value) || 0;
-    let lineup = 60; 
-
+    
     let oew = window.weightDB.oew; 
     let pax = parseFloat(document.getElementById('pax-weight').value)||0;
     let cgo = parseFloat(document.getElementById('cargo-total').value)||0;
@@ -249,7 +231,7 @@ function calculateTakeoff() {
     let isWet = document.getElementById('to-rwy-cond').value === 'WET';
     let elev = parseFloat(document.getElementById('to-elev-disp').innerText)||0; 
 
-    // Flex & N1 物理運算 (含高溫衰減)
+    // Flex & N1
     let fd = window.perfDB.flex_data;
     let bp = window.perfDB.bleed_penalty;
     let bleedLoss = bp.packs_on; 
@@ -277,6 +259,7 @@ function calculateTakeoff() {
     }
     n1 = n1 - bleedLoss;
 
+    // V-Speeds
     let spd = interpolate(tow, window.perfDB.takeoff_speeds);
     let conf = "1+F";
     if (effLen < 7500 || tow > 235000) conf = "2";
@@ -302,6 +285,25 @@ function calculateTakeoff() {
     let ifTrim = convertToIF(ths.raw);
     let greenDot = calculateGreenDot(towTons);
 
+    // [New] Calculate Takeoff Distance (TOD) in Feet
+    // Formula: Base (5900ft @ 200t) * (WeightFactor)^2
+    let dp = window.perfDB.dist_physics || { base_to_dist_ft: 5900, flex_penalty_factor: 0.005 };
+    let baseTOD = dp.base_to_dist_ft * Math.pow((tow / 200000), 2);
+    
+    // TOD Modifiers
+    if (slope > 0) baseTOD *= (1 + (slope * window.perfDB.runway_physics.slope_dist_factor)); // Uphill longer
+    if (slope < 0) baseTOD *= (1 + (slope * window.perfDB.runway_physics.slope_dist_factor * 0.5)); // Downhill shorter
+    
+    // Flex Penalty on TOD
+    if (flex !== "TOGA") {
+        let flexDiff = flex - fd.t_ref; 
+        if(flexDiff > 0) {
+            baseTOD *= (1 + (flexDiff * dp.flex_penalty_factor));
+        }
+    }
+    let estTOD = Math.round(baseTOD);
+
+    // Output
     document.getElementById('res-tow').innerText = Math.round(tow) + " KG";
     document.getElementById('res-tow').style.color = (tow > window.weightDB.limits.mtow) ? "#e74c3c" : "#fff";
     document.getElementById('res-conf').innerText = conf;
@@ -318,13 +320,19 @@ function calculateTakeoff() {
     let gdEl = document.getElementById('res-green-dot');
     if(gdEl) gdEl.innerText = greenDot + " KT";
 
+    // [New] Display Estimated TOD
+    let todEl = document.getElementById('res-to-dist');
+    if(todEl) {
+        todEl.innerText = estTOD + " FT";
+    }
+
     let trip = parseFloat(document.getElementById('trip-fuel').value)||0;
     document.getElementById('ldg-gw-input').value = Math.round(tow - trip);
     saveInputs();
 }
 
 // ============================================
-// 🛬 MCDU 級降落計算 (v26 Physics)
+// 🛬 MCDU 級降落計算 (v26.3 Physics + RLD)
 // ============================================
 function calculateLanding() {
     if(!window.perfDB || !window.weightDB) return;
@@ -365,13 +373,17 @@ function calculateLanding() {
     let windCorr = Math.max(5, Math.min(15, hw / 3)); 
     let vapp = Math.round(vls + vrefAdd + windCorr);
 
-    let baseDist = 1500 * (ldw / 180000); 
+    // [New] Calculate RLD in Feet
+    // Base 4920 ft (approx 1500m) at 180t
+    let dp = window.perfDB.dist_physics || { base_ld_dist_ft: 4920 };
+    let baseDist = dp.base_ld_dist_ft * (ldw / 180000); 
+
     if (slope < 0) baseDist *= (1 + (Math.abs(slope) * 0.10)); 
     if (isWet && useMaxRev) baseDist *= 0.9; 
     if (isWet && !useMaxRev) baseDist *= 1.1; 
 
     let safetyFactor = isWet ? 1.92 : 1.67;
-    let rld = baseDist * safetyFactor;
+    let rld = Math.round(baseDist * safetyFactor);
     
     let margin = len - rld;
 
@@ -394,6 +406,7 @@ function calculateLanding() {
     let ldgIF = convertToIF(ldgTHS.raw) + 5; 
     if(ldgIF > 100) ldgIF = 100;
 
+    // Output
     document.getElementById('res-ldw').innerText = Math.round(ldw) + " KG";
     document.getElementById('res-ldw').style.color = (ldw > window.weightDB.limits.mlw) ? "#e74c3c" : "#fff";
     let confEl = document.getElementById('res-conf-ldg');
@@ -403,6 +416,12 @@ function calculateLanding() {
     document.getElementById('res-ldg-trim').innerText = `${ldgTHS.text} (${ldgIF}%)`;
     document.getElementById('res-ldg-cg-display').innerText = ldgCG.toFixed(1) + "%";
     
+    // [New] Display Required Landing Distance
+    let distEl = document.getElementById('res-lnd-dist');
+    if(distEl) {
+        distEl.innerText = rld + " FT";
+    }
+
     saveInputs();
 }
 
@@ -431,7 +450,6 @@ function loadInputs() {
         if(d.desc) document.getElementById('ldg-flight-desc').innerText = d.desc;
         updatePaxWeight(); updateTotalCargo();
         
-        // Ensure manual toggle state reflects loaded values
         applyRunway('to');
         applyRunway('ldg');
     }
