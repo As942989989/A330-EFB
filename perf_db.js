@@ -1,5 +1,5 @@
 // ==========================================
-// ✈️ A330-300 (GE CF6) Advanced Physics DB v26
+// ✈️ A330-300 (GE CF6) Advanced Physics DB v26.3
 // ==========================================
 
 window.perfDB = {
@@ -102,5 +102,17 @@ window.perfDB = {
     n1_physics: {
         base_n1: 98.2,       // TOGA N1
         flex_correction: 0.22 
+    },
+
+    // --------------------------------------
+    // [New] 9. 距離估算模型 (Distance Calculation)
+    // --------------------------------------
+    dist_physics: {
+        // 起飛基準: 200噸, 海平面, ISA, TOGA
+        base_to_dist_ft: 5900,  // ~1800m
+        flex_penalty_factor: 0.005, // 每 1度 Flex 差距增加 0.5% 距離
+        
+        // 降落基準: 180噸, 海平面, ISA, CONF FULL, MAX BRAKE
+        base_ld_dist_ft: 4920   // ~1500m (ALD)
     }
 };
