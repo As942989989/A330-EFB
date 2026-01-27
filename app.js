@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 A330-300 EFB Core v26.3 (Distance & FT Units)
+// 🧠 A330-300 EFB Core v27.0 (OPT Iterative Logic)
 // ==========================================
 
 function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
@@ -23,13 +23,15 @@ function switchTab(t) {
     document.getElementById('btn-' + t).classList.add('active');
 }
 
-// [v26.2] 班表顯示優化
+// --------------------------------------------
+// Roster & UI Helper Functions
+// --------------------------------------------
 function renderRoster() {
     const list = document.getElementById('roster-list');
     list.innerHTML = '';
     if(!window.flightDB) return;
     for (const [k, v] of Object.entries(window.flightDB)) {
-        const totalCargo = (v.f || 0) + (v.a || 0); // 計算總貨重
+        const totalCargo = (v.f || 0) + (v.a || 0); 
         const d = document.createElement('div');
         d.className = `flight-card ${completedFlights[k]?'completed':''}`;
         d.onclick = (e) => { if(!e.target.classList.contains('check-btn')) loadFlight(k); };
@@ -68,7 +70,6 @@ function loadFlight(k) {
     let route = d.r.toUpperCase();
     let dep = route.split('-')[0].trim();
     let arr = route.split('-')[1].trim();
-
     document.getElementById('to-oat').value = ""; 
 
     if(window.airportDB) {
@@ -79,10 +80,8 @@ function loadFlight(k) {
     populateRunways('to-rwy-select', dep);
     populateRunways('ldg-rwy-select', arr);
     
-    // Reset to Manual Mode initially or handle defaults
     applyRunway('to'); 
     applyRunway('ldg');
-
     updatePaxWeight(); 
     updateTotalCargo(); 
     saveInputs(); 
@@ -109,7 +108,6 @@ function populateRunways(selectId, icao) {
 function applyRunway(prefix) {
     const sel = document.getElementById(prefix + '-rwy-select');
     const opt = sel.options[sel.selectedIndex];
-    
     const manualDiv = document.getElementById(prefix + '-manual-data');
     const infoDiv = document.getElementById(prefix + '-rwy-info');
 
@@ -130,25 +128,11 @@ function applyRunway(prefix) {
             `;
         }
         if(manualDiv) manualDiv.style.display = 'none';
-
     } else {
         if(manualDiv) manualDiv.style.display = 'block';
         if(infoDiv) infoDiv.style.display = 'none';
     }
-    
     saveInputs();
-}
-
-function computeInternalZFWCG() {
-    const BASE_CG = 24.0;
-    const PAX_FACTOR = 0.00020;
-    const FWD_FACTOR = -0.00050;
-    const AFT_FACTOR = 0.00070;
-    let paxWt = parseFloat(document.getElementById('pax-weight').value) || 0;
-    let fwdWt = parseFloat(document.getElementById('cargo-fwd').value) || 0;
-    let aftWt = parseFloat(document.getElementById('cargo-aft').value) || 0;
-    let cg = BASE_CG + (paxWt * PAX_FACTOR) + (fwdWt * FWD_FACTOR) + (aftWt * AFT_FACTOR);
-    return Math.max(18, Math.min(42, cg));
 }
 
 function updatePaxWeight(){
@@ -158,15 +142,16 @@ function updatePaxWeight(){
     let totalWeight = count * unit;
     document.getElementById("pax-weight").value = totalWeight;
     let dispEl = document.getElementById("pax-weight-disp");
-    if(dispEl) {
-        dispEl.innerText = totalWeight;
-    }
+    if(dispEl) dispEl.innerText = totalWeight;
 }
 
 function updateTotalCargo(){
     document.getElementById("cargo-total").value=(parseFloat(document.getElementById("cargo-fwd").value)||0)+(parseFloat(document.getElementById("cargo-aft").value)||0);
 }
 
+// --------------------------------------------
+// Physics Helper Functions
+// --------------------------------------------
 function interpolate(w, t) {
     for(let i=0; i<t.length-1; i++) {
         if(w>=t[i][0] && w<=t[i+1][0]) {
@@ -195,232 +180,314 @@ function calculateTHS(cg) {
 }
 
 function convertToIF(degRaw) {
-    let tp = window.perfDB.trim_physics;
     let result = (degRaw > 0) ? 15 + (degRaw * 8) : 15 - (Math.abs(degRaw) * 8);
     return Math.max(0, Math.min(100, Math.round(result)));
 }
 
-function calculateGreenDot(weightTons) {
-    return Math.round(0.6 * weightTons + 135);
+function computeInternalZFWCG() {
+    const BASE_CG = 24.0;
+    let paxWt = parseFloat(document.getElementById('pax-weight').value) || 0;
+    let fwdWt = parseFloat(document.getElementById('cargo-fwd').value) || 0;
+    let aftWt = parseFloat(document.getElementById('cargo-aft').value) || 0;
+    let cg = BASE_CG + (paxWt * 0.00020) + (fwdWt * -0.00050) + (aftWt * 0.00070);
+    return Math.max(18, Math.min(42, cg));
 }
 
 // ============================================
-// 🛫 MCDU 級起飛計算 (v26.3 Physics + TOD)
+// 🛫 OPT 起飛優化邏輯 (Iterative Calculation)
 // ============================================
 function calculateTakeoff() {
     if(!window.perfDB || !window.weightDB) return;
-    
-    let oatStr = document.getElementById('to-oat').value;
-    if(oatStr === "" || oatStr === null) { alert("⚠️ Enter OAT"); return; }
-    let oat = parseFloat(oatStr);
 
-    let qnh = 1013;
-    let slope = parseFloat(document.getElementById('to-rwy-slope').value) || 0;
+    // --- 1. 讀取輸入 ---
+    let oat = parseFloat(document.getElementById('to-oat').value);
+    if(isNaN(oat)) { alert("⚠️ Please Enter OAT"); return; }
     
-    let oew = window.weightDB.oew; 
+    let rwyLen = parseFloat(document.getElementById('to-rwy-len').value)||10000;
+    let slope = parseFloat(document.getElementById('to-rwy-slope').value) || 0;
+    let isWet = document.getElementById('to-rwy-cond').value === 'WET';
+    let elev = parseFloat(document.getElementById('to-elev-disp').innerText)||0;
+
+    let oew = window.weightDB.oew;
     let pax = parseFloat(document.getElementById('pax-weight').value)||0;
     let cgo = parseFloat(document.getElementById('cargo-total').value)||0;
     let fuel = parseFloat(document.getElementById('fuel-total').value)||0;
-    let tow = oew + pax + cgo + fuel; 
-    let towTons = tow / 1000;
-
-    let rwyLen = parseFloat(document.getElementById('to-rwy-len').value)||10000;
-    let slopePenalty = (slope > 0) ? (rwyLen * slope * 0.08) : 0; 
-    let effLen = rwyLen - 200 - slopePenalty;
-
-    let isWet = document.getElementById('to-rwy-cond').value === 'WET';
-    let elev = parseFloat(document.getElementById('to-elev-disp').innerText)||0; 
-
-    // Flex & N1
-    let fd = window.perfDB.flex_data;
-    let bp = window.perfDB.bleed_penalty;
-    let bleedLoss = bp.packs_on; 
-
-    let baseFlex = fd.base_temp + (fd.mtow - tow)*fd.slope_weight + Math.max(0, (effLen-8000)*fd.slope_runway);
+    let tow = oew + pax + cgo + fuel;
     
-    let tempPenalty = 0;
-    if (oat > fd.t_ref) {
-        tempPenalty = (oat - fd.t_ref) * fd.delta_t_penalty;
+    // --- 2. 定義單次計算函數 (Micro-Physics) ---
+    function computePerformance(tryFlex, tryConf) {
+        // A. 計算推力 (N1 & Distance Penalty)
+        let isToga = (tryFlex === "TOGA");
+        let tempForCalc = isToga ? oat : tryFlex;
+        
+        let fd = window.perfDB.flex_data;
+        let flexDelta = isToga ? 0 : (tempForCalc - fd.base_temp); 
+        // 確保 Flex 有效性
+        if (!isToga && tempForCalc < oat) return { valid: false, reason: "Flex < OAT" };
+
+        // 推力衰減導致的距離增加
+        let thrustPenaltyFactor = 1.0;
+        if (!isToga && flexDelta > 0) {
+            thrustPenaltyFactor += (flexDelta * fd.flex_dist_penalty);
+        }
+
+        // B. 計算 V-Speeds
+        let spd = interpolate(tow, window.perfDB.takeoff_speeds);
+        let corr = window.perfDB.conf_correction[tryConf];
+        let v1 = spd.v1 + corr.v1;
+        let vr = spd.vr + corr.vr;
+        let v2 = spd.v2 + corr.v2;
+
+        // 斜率修正 V1
+        if (slope < 0) v1 -= (Math.abs(slope) * window.perfDB.runway_physics.slope_v1_factor);
+        if (isWet) v1 -= 8;
+        if (v1 < 112) v1 = 112; 
+        if (v1 > vr) v1 = vr;
+
+        // C. 計算所需距離 (TOD)
+        let dp = window.perfDB.dist_physics;
+        let baseTOD = dp.base_to_dist_ft * Math.pow((tow / 200000), 2); // 重量平方律
+        
+        // 應用修正因子
+        baseTOD *= thrustPenaltyFactor; // 推力影響
+        baseTOD *= corr.dist_factor;    // 構型影響 (Conf 2/3 短)
+        
+        // 斜率與海拔
+        if (slope > 0) baseTOD *= (1 + (slope * window.perfDB.runway_physics.slope_dist_factor));
+        if (slope < 0) baseTOD *= (1 + (slope * window.perfDB.runway_physics.slope_dist_factor * 0.5));
+        baseTOD *= (1 + (elev/1000 * 0.05)); // 海拔修正
+
+        // 濕地 ASDA 檢查 (簡化版：增加所需距離)
+        if (isWet) baseTOD *= 1.1;
+
+        let margin = rwyLen - baseTOD;
+        
+        return {
+            valid: margin > 0,
+            margin: margin,
+            tod: Math.round(baseTOD),
+            v1: Math.round(v1),
+            vr: Math.round(vr),
+            v2: Math.round(v2),
+            flex: tryFlex,
+            conf: tryConf
+        };
     }
 
-    let isa = 15 - (elev / 1000 * 2);
-    let altPenalty = (elev / 1000) * fd.elev_penalty; 
+    // --- 3. 執行優化迴圈 (Optimization Loop) ---
+    // 邏輯：Conf 1+F (Max -> OAT) -> TOGA -> Conf 2 (Max -> OAT) -> TOGA -> Conf 3 ...
     
-    let flex = Math.floor(baseFlex - altPenalty - tempPenalty);
+    let configsToTry = ["1+F", "2", "3"];
+    let bestResult = null;
+    let maxFlex = window.perfDB.flex_data.max_temp;
 
-    if (flex <= oat) flex = "TOGA"; 
-    else if (flex > fd.max_temp) flex = fd.max_temp;
-    if (effLen < 6500 || slope > 0.5) flex = "TOGA";
+    loop_outer:
+    for (let conf of configsToTry) {
+        // Step A: Try Flex from Max down to OAT
+        for (let t = maxFlex; t >= oat; t--) {
+            let res = computePerformance(t, conf);
+            if (res.valid) {
+                bestResult = res;
+                break loop_outer; // 找到最佳解 (最高 Flex, 最小 Conf)，停止搜尋
+            }
+        }
 
-    let n1 = window.perfDB.n1_physics.base_n1; 
-    if (flex !== "TOGA") {
-        let deltaFlex = flex - oat;
-        n1 -= (deltaFlex * window.perfDB.n1_physics.flex_correction);
+        // Step B: Try TOGA for this config
+        let togaRes = computePerformance("TOGA", conf);
+        if (togaRes.valid) {
+            bestResult = togaRes;
+            break loop_outer; // 該構型 TOGA 可行
+        }
+        
+        // 該構型完全不可行，進入下一構型
     }
-    n1 = n1 - bleedLoss;
 
-    // V-Speeds
-    let spd = interpolate(tow, window.perfDB.takeoff_speeds);
-    let conf = "1+F";
-    if (effLen < 7500 || tow > 235000) conf = "2";
-    
-    let corr = window.perfDB.conf_correction[conf] || {v1:0,vr:0,v2:0};
-    let v1 = spd.v1 + corr.v1;
-    let vr = spd.vr + corr.vr;
-    let v2 = spd.v2 + corr.v2;
-
-    if (slope < 0) {
-        v1 -= (Math.abs(slope) * window.perfDB.runway_physics.slope_v1_factor);
+    // --- 4. 結果輸出 ---
+    if (!bestResult) {
+        alert("⚠️ PERFORMANCE LIMIT EXCEEDED (Too Heavy or Runway Short)");
+        document.getElementById('res-tow').style.color = "red";
+        document.getElementById('res-tow').innerText = "LIMIT EXCEEDED";
+        return;
     }
-    if (isWet) v1 -= 8;
 
-    if (v1 < 112) v1 = 112; 
-    if (v1 > vr) v1 = vr;
+    // 計算 N1
+    let n1 = window.perfDB.n1_physics.base_n1;
+    if (bestResult.flex !== "TOGA") {
+        let delta = bestResult.flex - oat;
+        n1 -= (delta * window.perfDB.n1_physics.flex_correction);
+    }
+    n1 -= window.perfDB.bleed_penalty.packs_on;
 
+    // 計算 Trim
     let zfwCG = computeInternalZFWCG();
     let fuelEffect = fuel * window.perfDB.trim_physics.fuel_cg_effect;
-    let towCG = zfwCG + fuelEffect;
-    if(towCG > 42) towCG = 42;
+    let towCG = Math.min(42, zfwCG + fuelEffect);
     let ths = calculateTHS(towCG);
     let ifTrim = convertToIF(ths.raw);
-    let greenDot = calculateGreenDot(towTons);
 
-    // [New] Calculate Takeoff Distance (TOD) in Feet
-    // Formula: Base (5900ft @ 200t) * (WeightFactor)^2
-    let dp = window.perfDB.dist_physics || { base_to_dist_ft: 5900, flex_penalty_factor: 0.005 };
-    let baseTOD = dp.base_to_dist_ft * Math.pow((tow / 200000), 2);
-    
-    // TOD Modifiers
-    if (slope > 0) baseTOD *= (1 + (slope * window.perfDB.runway_physics.slope_dist_factor)); // Uphill longer
-    if (slope < 0) baseTOD *= (1 + (slope * window.perfDB.runway_physics.slope_dist_factor * 0.5)); // Downhill shorter
-    
-    // Flex Penalty on TOD
-    if (flex !== "TOGA") {
-        let flexDiff = flex - fd.t_ref; 
-        if(flexDiff > 0) {
-            baseTOD *= (1 + (flexDiff * dp.flex_penalty_factor));
-        }
-    }
-    let estTOD = Math.round(baseTOD);
-
-    // Output
+    // 更新 UI
     document.getElementById('res-tow').innerText = Math.round(tow) + " KG";
     document.getElementById('res-tow').style.color = (tow > window.weightDB.limits.mtow) ? "#e74c3c" : "#fff";
-    document.getElementById('res-conf').innerText = conf;
+    
+    document.getElementById('res-conf').innerText = bestResult.conf;
     let flexEl = document.getElementById('res-flex');
-    flexEl.innerText = (flex === "TOGA") ? "TOGA" : flex + "°";
-    flexEl.style.color = (flex === "TOGA") ? "#e74c3c" : "#00bfff";
+    flexEl.innerText = (bestResult.flex === "TOGA") ? "TOGA" : bestResult.flex + "°";
+    flexEl.style.color = (bestResult.flex === "TOGA") ? "#e74c3c" : "#00bfff";
+    
     document.getElementById('res-n1').innerText = n1.toFixed(1) + "%";
     document.getElementById('res-trim').innerText = `${ths.text} (${ifTrim}%)`;
     document.getElementById('res-tow-cg-display').innerText = towCG.toFixed(1) + "%";
-    document.getElementById('res-v1').innerText = Math.round(v1);
-    document.getElementById('res-vr').innerText = Math.round(vr);
-    document.getElementById('res-v2').innerText = Math.round(v2);
     
-    let gdEl = document.getElementById('res-green-dot');
-    if(gdEl) gdEl.innerText = greenDot + " KT";
+    document.getElementById('res-v1').innerText = bestResult.v1;
+    document.getElementById('res-vr').innerText = bestResult.vr;
+    document.getElementById('res-v2').innerText = bestResult.v2;
+    document.getElementById('res-to-dist').innerText = bestResult.tod + " FT";
+    
+    let gd = Math.round(0.6 * (tow/1000) + 135);
+    document.getElementById('res-green-dot').innerText = gd + " KT";
 
-    // [New] Display Estimated TOD
-    let todEl = document.getElementById('res-to-dist');
-    if(todEl) {
-        todEl.innerText = estTOD + " FT";
-    }
-
+    // 更新降落預算重量
     let trip = parseFloat(document.getElementById('trip-fuel').value)||0;
     document.getElementById('ldg-gw-input').value = Math.round(tow - trip);
     saveInputs();
 }
 
 // ============================================
-// 🛬 MCDU 級降落計算 (v26.3 Physics + RLD)
+// 🛬 OPT 降落矩陣邏輯 (Matrix Calculation)
 // ============================================
 function calculateLanding() {
     if(!window.perfDB || !window.weightDB) return;
-    
-    let ldw = parseFloat(document.getElementById('ldg-gw-input').value);
-    if(!ldw) {
-        let oew = window.weightDB.oew;
-        let pax = parseFloat(document.getElementById('pax-weight').value)||0;
-        let cgo = parseFloat(document.getElementById('cargo-total').value)||0;
-        let fuel = parseFloat(document.getElementById('fuel-total').value)||0;
-        let trip = parseFloat(document.getElementById('trip-fuel').value)||0;
-        ldw = (oew + pax + cgo + fuel) - trip;
-        document.getElementById('ldg-gw-input').value = Math.round(ldw);
-    }
 
-    let len = parseFloat(document.getElementById('ldg-rwy-len').value)||10000;
-    let isWet = document.getElementById('ldg-rwy-cond').value === 'WET';
+    let ldw = parseFloat(document.getElementById('ldg-gw-input').value) || 0;
+    let rwyLen = parseFloat(document.getElementById('ldg-rwy-len').value)||10000;
     let slope = parseFloat(document.getElementById('ldg-rwy-slope').value) || 0;
-    let revEl = document.getElementById('ldg-rev');
-    let useMaxRev = (revEl && revEl.value === 'max');
-    
+    let isWet = document.getElementById('ldg-rwy-cond').value === 'WET';
+    let revMode = document.getElementById('ldg-rev').value; // 'idle' or 'max'
+    let hasRev = (revMode === 'max');
+
     let wdir = parseFloat(document.getElementById('ldg-wind-dir').value)||0;
     let wspd = parseFloat(document.getElementById('ldg-wind-spd').value)||0;
     let rhdg = parseFloat(document.getElementById('ldg-rwy-hdg').value)||0;
     
+    // 計算風量
     let angleRad = Math.abs(rhdg - wdir) * (Math.PI / 180);
     let hw = Math.cos(angleRad) * wspd;
-    let xw = Math.abs(Math.sin(angleRad) * wspd);
 
-    let conf = "FULL";
-    let vrefAdd = 0;
-    if (xw > 20) {
-        conf = "3";
-        vrefAdd = window.perfDB.landing_conf3_add;
-    }
+    // --- 1. 準備矩陣選項 ---
+    // 我們要計算 Conf 3 和 Full 在不同 Autobrake 下的距離
+    let scenarios = [
+        { conf: 'FULL', ab: 'MAX' },
+        { conf: 'FULL', ab: 'MED' },
+        { conf: 'FULL', ab: 'LO' },
+        { conf: '3',    ab: 'MED' }
+    ];
 
-    let vls = interpolateVLS(ldw, window.perfDB.landing_vls_full);
-    let windCorr = Math.max(5, Math.min(15, hw / 3)); 
-    let vapp = Math.round(vls + vrefAdd + windCorr);
+    let matrixResults = [];
+    let bestOption = null;
 
-    // [New] Calculate RLD in Feet
-    // Base 4920 ft (approx 1500m) at 180t
-    let dp = window.perfDB.dist_physics || { base_ld_dist_ft: 4920 };
-    let baseDist = dp.base_ld_dist_ft * (ldw / 180000); 
+    // --- 2. 矩陣計算迴圈 ---
+    let dp = window.perfDB.dist_physics;
+    let decel = window.perfDB.decel_physics;
 
-    if (slope < 0) baseDist *= (1 + (Math.abs(slope) * 0.10)); 
-    if (isWet && useMaxRev) baseDist *= 0.9; 
-    if (isWet && !useMaxRev) baseDist *= 1.1; 
+    scenarios.forEach(sc => {
+        // A. Vref & Vapp
+        let vls = interpolateVLS(ldw, window.perfDB.landing_vls_full);
+        if (sc.conf === '3') vls += window.perfDB.landing_conf3_add;
+        let windCorr = Math.max(5, Math.min(15, hw / 3)); 
+        let vapp = Math.round(vls + windCorr);
 
-    let safetyFactor = isWet ? 1.92 : 1.67;
-    let rld = Math.round(baseDist * safetyFactor);
+        // B. 基礎物理距離 (Air Distance + Transition + Braking)
+        // Base ALD (180T)
+        let dist = dp.base_ld_dist_ft * (ldw / 180000); // 重量修正
+
+        // C. 減速修正
+        dist *= decel.autobrake[sc.ab]; // Autobrake 係數
+        if (sc.conf === '3') dist *= decel.conf3_penalty; // Conf 3 較長
+
+        // D. 環境修正
+        if (slope < 0) dist *= (1 + (Math.abs(slope) * 0.10)); // 下坡
+        
+        // E. 反推修正
+        let revFactor = isWet ? decel.rev_credit.wet : decel.rev_credit.dry;
+        if (hasRev) dist *= (1 - revFactor);
+        
+        // F. 安全係數 (RLD)
+        let safety = isWet ? decel.safety_margin.wet : decel.safety_margin.dry;
+        let rld = Math.round(dist * safety);
+        let margin = rwyLen - rld;
+
+        let status = (margin >= 0) ? "GO" : "NO";
+        let color = (margin >= 0) ? "#00ff00" : "#e74c3c";
+
+        matrixResults.push({
+            conf: sc.conf,
+            ab: sc.ab,
+            vapp: vapp,
+            dist: rld,
+            status: status,
+            color: color
+        });
+
+        // 挑選顯示在主摘要的最佳選項 (優先選 Conf Full, AB MED/LO)
+        if (status === "GO" && !bestOption) bestOption = matrixResults[matrixResults.length-1];
+        if (status === "GO" && sc.conf === "FULL" && sc.ab === "MED") bestOption = matrixResults[matrixResults.length-1];
+    });
+
+    // --- 3. 渲染矩陣表格 ---
+    // 我們將取代原本的 .data-grid，改為顯示詳細矩陣
     
-    let margin = len - rld;
+    // 如果全失敗，顯示警告
+    if (!bestOption) bestOption = matrixResults[0]; // 顯示第一個(雖然失敗)
 
-    let ab = "LO";
-    if (margin < 2000 || isWet || slope < -0.5) ab = "MED";
-    if (margin < 500) ab = "MAX"; 
-
-    let abEl = document.getElementById('res-autobrake');
-    if (margin < 0) {
-        abEl.innerText = "NO LND";
-        abEl.style.color = "red";
-    } else {
-        abEl.innerText = ab;
-        abEl.style.color = "#fff";
-    }
-
+    // Trim 計算
     let zfwCG = computeInternalZFWCG();
-    let ldgCG = zfwCG - 0.5; 
+    let ldgCG = zfwCG - 0.5;
     let ldgTHS = calculateTHS(ldgCG);
-    let ldgIF = convertToIF(ldgTHS.raw) + 5; 
-    if(ldgIF > 100) ldgIF = 100;
+    let ldgIF = convertToIF(ldgTHS.raw) + 5;
 
-    // Output
+    // 更新 Header 結果
     document.getElementById('res-ldw').innerText = Math.round(ldw) + " KG";
     document.getElementById('res-ldw').style.color = (ldw > window.weightDB.limits.mlw) ? "#e74c3c" : "#fff";
-    let confEl = document.getElementById('res-conf-ldg');
-    confEl.innerText = conf;
-    confEl.style.color = (conf === "3") ? "#e74c3c" : "#fff";
-    document.getElementById('res-vapp').innerText = vapp;
-    document.getElementById('res-ldg-trim').innerText = `${ldgTHS.text} (${ldgIF}%)`;
-    document.getElementById('res-ldg-cg-display').innerText = ldgCG.toFixed(1) + "%";
+
+    // 構建 HTML 表格
+    let tableHTML = `
+        <table class="landing-matrix">
+            <thead>
+                <tr>
+                    <th>CONF</th>
+                    <th>BRK</th>
+                    <th>VAPP</th>
+                    <th>DIST</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
     
-    // [New] Display Required Landing Distance
-    let distEl = document.getElementById('res-lnd-dist');
-    if(distEl) {
-        distEl.innerText = rld + " FT";
-    }
+    matrixResults.forEach(r => {
+        tableHTML += `
+            <tr>
+                <td style="color:${r.conf==='3'?'#ffcc00':'#fff'}">${r.conf}</td>
+                <td>${r.ab}</td>
+                <td style="color:#00bfff">${r.vapp}</td>
+                <td>${r.dist}</td>
+                <td style="font-weight:bold; color:${r.color}">${r.status}</td>
+            </tr>
+        `;
+    });
+    tableHTML += `</tbody></table>`;
+
+    // 插入到 UI
+    let perfSection = document.querySelector('#tab-landing .perf-section');
+    perfSection.innerHTML = `
+        <div class="perf-title" style="color:#ffcc00;">LANDING DISTANCE MATRIX (RLD)</div>
+        ${tableHTML}
+        <div style="border-bottom:1px solid #333;margin:8px 0;"></div>
+        <div class="data-grid" style="grid-template-columns: 1fr 1fr;">
+             <div class="data-item"><div>TRIM (THS)</div><div id="res-ldg-trim">${ldgTHS.text} (${Math.min(100, ldgIF)}%)</div></div>
+             <div class="data-item"><div>LDG CG</div><div id="res-ldg-cg-display">${ldgCG.toFixed(1)}%</div></div>
+        </div>
+    `;
 
     saveInputs();
 }
