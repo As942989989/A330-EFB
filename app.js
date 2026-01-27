@@ -325,7 +325,7 @@ function calculateTakeoff() {
     let ths = calculateTHS(towCG);
     let ifTrim = convertToIF(ths.raw);
 
-    // 更新 UI
+     // 更新 UI
     document.getElementById('res-tow').innerText = Math.round(tow) + " KG";
     document.getElementById('res-tow').style.color = (tow > window.weightDB.limits.mtow) ? "#e74c3c" : "#fff";
     
@@ -343,8 +343,18 @@ function calculateTakeoff() {
     document.getElementById('res-v2').innerText = bestResult.v2;
     document.getElementById('res-to-dist').innerText = bestResult.tod + " FT";
     
+    // [修正] 顯示 Green Dot
     let gd = Math.round(0.6 * (tow/1000) + 135);
     document.getElementById('res-green-dot').innerText = gd + " KT";
+
+    // [新增] 顯示 Stop Margin (ASDA - ASD)
+    let marginEl = document.getElementById('res-stop-margin');
+    if (marginEl) {
+        let marginVal = Math.round(bestResult.margin);
+        marginEl.innerText = (marginVal >= 0 ? "+" : "") + marginVal + " FT";
+        // 如果餘裕小於 800呎 顯示橘色警告，否則綠色
+        marginEl.style.color = (marginVal < 800) ? "orange" : "#2ecc71";
+    }
 
     // 更新降落預算重量
     let trip = parseFloat(document.getElementById('trip-fuel').value)||0;
