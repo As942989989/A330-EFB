@@ -156,23 +156,15 @@
             <button class="btn-calc" onclick="calculateLanding()">CALCULATE LANDING</button>
 
             <div class="result-box">
-                <div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="color:#888;font-size:12px;">EST. LANDING WEIGHT</span><span id="res-ldw" style="font-size:14px;font-weight:bold;color:#fff;">--- KG</span></div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+                    <span style="color:#888;font-size:12px;">EST. LANDING WEIGHT</span>
+                    <span id="res-ldw" style="font-size:14px;font-weight:bold;color:#fff;">--- KG</span>
+                </div>
+                
                 <div class="perf-section">
-                    <div class="perf-title" style="color:#ffcc00;">LANDING DATA</div>
-                    <div class="data-grid">
-                        <div class="data-item"><div>VAPP</div><div id="res-vapp" style="color:#ffcc00;">--</div></div>
-                        <div class="data-item"><div>CONF</div><div id="res-conf-ldg">FULL</div></div>
-                        <div class="data-item"><div>AUTO BRK</div><div id="res-autobrake">--</div></div>
-                    </div>
-                    <div style="border-bottom:1px solid #333;margin:8px 0;"></div>
-                    <div class="data-grid" style="grid-template-columns: 1fr 1fr;">
-                         <div class="data-item"><div>TRIM (THS)</div><div id="res-ldg-trim">--</div></div>
-                         <div class="data-item"><div>LDG CG</div><div id="res-ldg-cg-display">--</div></div>
-                    </div>
-
-                    <div style="display:flex; justify-content:space-between; padding:0 10px; margin-top:5px;">
-                        <span style="font-size:10px;color:#888;">REQ LND DIST</span>
-                        <span id="res-lnd-dist" style="font-size:14px;color:#fff;font-weight:bold;">-- FT</span>
+                    <div class="perf-title" style="color:#666;">PERFORMANCE MATRIX</div>
+                    <div style="text-align:center; padding:20px; color:#444; font-size:12px; font-style:italic;">
+                        Press CALCULATE to generate<br>Landing Distance Matrix (RLD)
                     </div>
                 </div>
             </div>
