@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 A330-300 EFB Core v28.3 (Patched Logic)
+// 🧠 A330-300 EFB Core v29.0 (Auto-Dispatch)
 // ==========================================
 
 function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
@@ -8,11 +8,27 @@ function safeRem(k){try{localStorage.removeItem(k)}catch(e){}}
 let completedFlights = JSON.parse(safeGet('a330_roster_v25')) || {};
 
 window.onload = function() {
+    // === 自動版本號 ===
+    const baseVersion = "v29.0"; 
+    let lastMod = document.lastModified; 
+    let dateStr = "";
+    try {
+        let d = new Date(lastMod);
+        dateStr = (d.getMonth()+1) + "/" + d.getDate() + " " + d.getHours() + ":" + String(d.getMinutes()).padStart(2, '0');
+    } catch(e) { dateStr = "Dev"; }
+
+    let titleEl = document.querySelector('.nav-header');
+    if(titleEl) {
+        // 保留按鈕，只改文字
+        let btnHTML = titleEl.innerHTML.match(/<button.*<\/button>/)[0];
+        titleEl.innerHTML = `A330 OPT <span style="font-size:12px; color:#00ff00;">${baseVersion} (${dateStr})</span>` + btnHTML;
+    }
+    // ================
+
     if (!window.flightDB || !window.perfDB || !window.weightDB || !window.airportDB) {
         alert("⚠️ DB Error! Ensure all JS files are loaded.");
     } else {
         renderRoster();
-        // 嘗試載入上次輸入，但不要報錯
         try { loadInputs(); } catch(e) { console.log("No prev inputs"); }
     }
 };
@@ -29,7 +45,7 @@ function switchTab(t) {
 }
 
 // --------------------------------------------
-// Roster & UI Helper Functions
+// Roster Functions
 // --------------------------------------------
 function renderRoster() {
     const list = document.getElementById('roster-list');
@@ -37,6 +53,7 @@ function renderRoster() {
     list.innerHTML = '';
     if(!window.flightDB) return;
     for (const [k, v] of Object.entries(window.flightDB)) {
+        // 在列表顯示時，隱藏具體數字，只顯示 d 欄位
         const infoTag = v.type === "PAX" ? "PAX" : (v.type === "CGO" ? "CGO" : "FERRY");
         
         const d = document.createElement('div');
@@ -67,7 +84,6 @@ function loadFlight(k) {
     if(!window.flightDB[k]) return;
     const d = window.flightDB[k];
     
-    // UI 標題更新
     let t1 = document.getElementById('to-flight-title');
     let t2 = document.getElementById('ldg-flight-desc');
     let t3 = document.getElementById('dsp-flight');
@@ -80,7 +96,6 @@ function loadFlight(k) {
     let dep = route.split('-')[0].trim();
     let arr = route.split('-')[1].trim();
     
-    // 清空舊數據
     let oatEl = document.getElementById('to-oat');
     if(oatEl) oatEl.value = ""; 
 
@@ -95,7 +110,7 @@ function loadFlight(k) {
     applyRunway('to'); 
     applyRunway('ldg');
     
-    // *** 初始化 Dispatch ***
+    // 初始化調度數據
     initDispatchSession(k); 
     switchTab('dispatch'); 
 }
@@ -149,23 +164,12 @@ function applyRunway(prefix) {
 }
 
 // --------------------------------------------
-// Physics Helper Functions (FIXED)
+// Physics Helper Functions
 // --------------------------------------------
-
-// [修復] 差值計算增加邊界檢查，防止極端重量導致崩潰或錯誤讀數
 function interpolate(w, t) {
-    // 1. 低於最小值 (Empty/Ferry)：鎖定最小值
-    if (w <= t[0][0]) {
-        let l = t[0];
-        return {v1: l[1], vr: l[2], v2: l[3]};
-    }
-    // 2. 高於最大值 (Overweight)：鎖定最大值
-    if (w >= t[t.length-1][0]) {
-        let l = t[t.length-1];
-        return {v1: l[1], vr: l[2], v2: l[3]};
-    }
+    if (w <= t[0][0]) { let l = t[0]; return {v1: l[1], vr: l[2], v2: l[3]}; }
+    if (w >= t[t.length-1][0]) { let l = t[t.length-1]; return {v1: l[1], vr: l[2], v2: l[3]}; }
 
-    // 3. 正常區間
     for(let i=0; i<t.length-1; i++) {
         if(w >= t[i][0] && w <= t[i+1][0]) {
             let r = (w-t[i][0])/(t[i+1][0]-t[i][0]);
@@ -176,15 +180,12 @@ function interpolate(w, t) {
             };
         }
     }
-    // Fallback
     let l=t[t.length-1]; return {v1:l[1],vr:l[2],v2:l[3]};
 }
 
-// [修復] VLS 差值同樣增加邊界檢查
 function interpolateVLS(w, t) {
     if (w <= t[0][0]) return t[0][1];
     if (w >= t[t.length-1][0]) return t[t.length-1][1];
-
     for(let i=0; i<t.length-1; i++) {
         if(w >= t[i][0] && w <= t[i+1][0]) {
             let r = (w-t[i][0])/(t[i+1][0]-t[i][0]);
@@ -215,9 +216,6 @@ function computeInternalZFWCG() {
     return Math.max(18, Math.min(42, cg));
 }
 
-// --------------------------------------------
-// Legacy Helper Wrappers (Compatible)
-// --------------------------------------------
 function updatePaxWeight(){
     if(!window.weightDB) return;
     let count = parseFloat(document.getElementById("pax-count").value) || 0;
@@ -233,212 +231,121 @@ function updateTotalCargo(){
 }
 
 // ============================================
-// 📝 DISPATCH LOGIC (v28.2 Fixed)
+// 📝 DISPATCH LOGIC (Read-Only Bars)
 // ============================================
 
 let currentDispatchState = {
     flightId: null,
     dist: 0,
-    type: "PAX",
-    profile: "BIZ",
-    limitTOW: 242000,
-    bagsPerPax: 13,
-    trimMode: "STD"
+    pax: 0,
+    cgoF: 0,
+    cgoA: 0,
+    fuel: 0
 };
 
 function initDispatchSession(flightId) {
     const f = window.flightDB[flightId];
     if(!f) return;
 
-    // 1. 初始化狀態
+    // 1. 讀取數據 (從 Roster)
     currentDispatchState.flightId = flightId;
     currentDispatchState.dist = f.dist || 500;
-    currentDispatchState.type = f.type || "PAX";
-    currentDispatchState.profile = f.profile || "BIZ";
-
-    // 2. 取得 UI 元素
-    const paxSlider = document.getElementById('slider-dsp-pax');
-    const cgoSlider = document.getElementById('slider-dsp-cgo');
-    const profileTag = document.getElementById('dsp-profile-tag');
-    const trimTag = document.getElementById('dsp-trim-tag');
-    const distDisp = document.getElementById('dsp-dist-disp');
     
-    if(profileTag) profileTag.innerText = currentDispatchState.profile;
-    if(distDisp) distDisp.innerText = currentDispatchState.dist + " NM";
+    // 讀取隱藏數據，若無則為0
+    currentDispatchState.pax = f.pax !== undefined ? f.pax : 0;
+    currentDispatchState.cgoF = f.cgoF !== undefined ? f.cgoF : 0;
+    currentDispatchState.cgoA = f.cgoA !== undefined ? f.cgoA : 0;
 
-    // 3. 設定 Slider 與參數
-    if (f.type === "PAX") {
-        paxSlider.max = 441;
-        
-        if (f.profile === "LEISURE") {
-            currentDispatchState.bagsPerPax = 20;
-            currentDispatchState.trimMode = "AFT";
-            paxSlider.value = 400; 
-            cgoSlider.value = 5000;
-        } else {
-            currentDispatchState.bagsPerPax = 13;
-            currentDispatchState.trimMode = "STD";
-            paxSlider.value = 350; 
-            cgoSlider.value = 10000;
-        }
-    } else if (f.type === "CGO") {
-        paxSlider.max = 0; // 貨機無客
-        paxSlider.value = 0;
-        currentDispatchState.bagsPerPax = 0;
-        currentDispatchState.trimMode = "FWD"; 
-        cgoSlider.value = 35000; // 較高預設值
-    } else {
-        // Ferry
-        paxSlider.value = 0;
-        cgoSlider.value = 0;
-        currentDispatchState.bagsPerPax = 0;
-        currentDispatchState.trimMode = "NEUTRAL";
-    }
+    // 2. 自動計算燃油
+    // 燃油公式: Trip (Dist * 12.5) + Reserves (~5500)
+    let payloadTons = ((currentDispatchState.pax * 77) + currentDispatchState.cgoF + currentDispatchState.cgoA) / 1000;
+    let penalty = payloadTons * 0.04 * f.dist; // 載重懲罰
+    let trip = (f.dist * 12.5) + penalty;
+    let rsv = 2400 + 2500 + 600; // Contingency + Alt + Taxi
+    currentDispatchState.fuel = Math.round(trip + rsv);
 
-    if(trimTag) trimTag.innerText = currentDispatchState.trimMode;
-
-    // 4. 重置燃油並計算
-    document.getElementById('inp-dsp-fuel').value = "";
-    updateDispatchCalc(); // 修正呼叫名稱
+    // 3. 更新 UI
+    document.getElementById('dsp-dist-disp').innerText = f.dist + " NM";
+    updateDispatchDisplay();
 }
 
-// 核心計算函數：名稱必須與 HTML oninput 一致
-function updateDispatchCalc() {
+function updateDispatchDisplay() {
     if(!window.weightDB) return;
 
-    // --- A. 讀取滑桿數據 ---
-    let paxSlider = document.getElementById('slider-dsp-pax');
-    let cgoSlider = document.getElementById('slider-dsp-cgo');
+    // --- PAX Display ---
+    let pax = currentDispatchState.pax;
+    let paxWt = pax * window.weightDB.pax_unit;
+    // 假設每人 13kg 行李
+    let bagWt = pax * 13; 
+    let totalPaxLoad = paxWt + bagWt;
+
+    document.getElementById('dsp-pax-count').innerText = pax;
+    document.getElementById('dsp-pax-total-wt').innerText = totalPaxLoad;
     
-    let paxVal = parseInt(paxSlider.value) || 0;
-    let cgoVal = parseInt(cgoSlider.value) || 0;
+    // Update Pax Bar
+    let paxPct = (pax / 441) * 100;
+    document.getElementById('bar-pax').style.width = paxPct + "%";
 
-    // 更新顯示文字
-    document.getElementById('val-dsp-pax').innerText = paxVal;
-    document.getElementById('val-dsp-cgo').innerText = cgoVal;
+    // --- Cargo Display ---
+    let cgoF = currentDispatchState.cgoF;
+    let cgoA = currentDispatchState.cgoA;
+    let totalCgo = cgoF + cgoA;
 
-    // --- B. 計算重量 ---
-    let paxWt = paxVal * 77;
-    let bagWt = paxVal * currentDispatchState.bagsPerPax;
-    
-    // 更新細項顯示 (注意：HTML 必須有這些 ID)
-    let elPaxWt = document.getElementById('dsp-pax-wt');
-    let elBagWt = document.getElementById('dsp-bag-wt');
-    let elCgoWt = document.getElementById('dsp-cgo-wt');
-    
-    if(elPaxWt) elPaxWt.innerText = paxWt;
-    if(elBagWt) elBagWt.innerText = bagWt;
-    if(elCgoWt) elCgoWt.innerText = cgoVal;
+    document.getElementById('dsp-cgo-total').innerText = totalCgo;
+    document.getElementById('dsp-cgo-fwd-val').innerText = cgoF;
+    document.getElementById('dsp-cgo-aft-val').innerText = cgoA;
 
-    let totalLoad = paxWt + bagWt + cgoVal;
-    let elTotal = document.getElementById('dsp-total-load');
-    if(elTotal) elTotal.innerText = totalLoad;
+    // Update Cargo Bars & Ratios
+    let pctF = totalCgo > 0 ? Math.round((cgoF / totalCgo) * 100) : 50;
+    let pctA = totalCgo > 0 ? (100 - pctF) : 50;
 
+    document.getElementById('bar-cgo-fwd').style.width = pctF + "%";
+    document.getElementById('bar-cgo-aft').style.width = pctA + "%";
+    document.getElementById('dsp-cgo-fwd-pct').innerText = pctF + "%";
+    document.getElementById('dsp-cgo-aft-pct').innerText = pctA + "%";
+
+    // --- Fuel & Weight ---
+    let fuel = currentDispatchState.fuel;
+    document.getElementById('dsp-est-fuel').innerText = fuel;
+
+    let totalLoad = totalPaxLoad + totalCgo;
     let zfw = window.weightDB.oew + totalLoad;
-    document.getElementById('dsp-res-zfw').innerText = Math.round(zfw);
-
-    // --- C. 跑道限重分析 ---
-    let toLen = parseFloat(document.getElementById('to-rwy-len').value) || 12000;
-    let ldgLen = parseFloat(document.getElementById('ldg-rwy-len').value) || 12000;
-    let minLen = Math.min(toLen, ldgLen);
-    
-    let limitTOW = 242000;
-    let rwyMsg = "UNRESTRICTED";
-    
-    if (minLen < 8000) {
-        limitTOW = 195000;
-        rwyMsg = "SEVERE (<8000')";
-    } else if (minLen < 9000) {
-        limitTOW = 220000;
-        rwyMsg = "LIMITED (<9000')";
-    }
-    
-    document.getElementById('dsp-limit-tow').innerText = (limitTOW/1000) + "T";
-    let statusEl = document.getElementById('dsp-rwy-status');
-    if(statusEl) {
-        statusEl.innerText = rwyMsg;
-        statusEl.style.color = limitTOW < 242000 ? "#f1c40f" : "#2ecc71";
-    }
-
-    // --- D. 燃油計算 ---
-    let dist = currentDispatchState.dist;
-    // 1. 載重成本: 每噸載重每 1000nm 多燒 40kg
-    let payloadTons = totalLoad / 1000;
-    let weightPenalty = payloadTons * 0.04 * dist;
-    
-    // 2. 基礎航程油耗 (Base Burn 12.5 kg/nm) + 懲罰
-    let tripFuel = (dist * 12.5) + weightPenalty;
-    
-    // 3. 法規儲備 (Contingency 5% + Final 30min + Alt 2500 + Taxi 600)
-    let minBlock = Math.round(tripFuel * 1.05 + 2400 + 2500 + 600);
-
-    let fuelStatusEl = document.getElementById('dsp-fuel-status');
-    if(fuelStatusEl) fuelStatusEl.innerText = "MIN REQ: " + minBlock;
-
-    // --- E. 最終結果 ---
-    let userFuel = parseFloat(document.getElementById('inp-dsp-fuel').value) || minBlock;
-    let tow = zfw + userFuel;
-    let tripBurn = Math.round(tripFuel);
+    let tow = zfw + fuel;
+    // Trip Fuel approx (Dist * 12.5)
+    let tripBurn = Math.round(currentDispatchState.dist * 12.5);
     let lw = tow - tripBurn;
 
+    document.getElementById('dsp-res-zfw').innerText = Math.round(zfw);
     document.getElementById('dsp-res-tow').innerText = Math.round(tow);
     document.getElementById('dsp-res-lw').innerText = Math.round(lw);
 
-    // Underload (剩餘載重能力)
+    // Limit Check
+    let limitTOW = 242000; 
+    // 簡單跑道檢查 (To simulate logic)
+    let toLen = parseFloat(document.getElementById('to-rwy-len').value) || 10000;
+    if (toLen < 9000) limitTOW = 220000;
+
+    document.getElementById('dsp-limit-tow').innerText = (limitTOW/1000) + "T";
     let underload = limitTOW - tow;
     let ulEl = document.getElementById('dsp-underload');
-    if(ulEl) {
-        ulEl.innerText = (underload >= 0 ? "+" : "") + Math.round(underload);
-        ulEl.style.color = (underload < 0) ? "#e74c3c" : "#00bfff";
-    }
-
-    // 燃油輸入框警告
-    let fuelInput = document.getElementById('inp-dsp-fuel');
-    if (document.getElementById('inp-dsp-fuel').value && userFuel < minBlock) {
-        fuelInput.style.borderColor = "red";
-        fuelInput.style.color = "red";
-    } else {
-        fuelInput.style.borderColor = "#444";
-        fuelInput.style.color = "#00ff00";
-    }
-    
-    // 儲存臨時 trip fuel 供稍後使用
-    currentDispatchState.calcTripFuel = tripBurn;
+    ulEl.innerText = (underload >= 0 ? "+" : "") + Math.round(underload);
+    ulEl.style.color = (underload < 0) ? "#e74c3c" : "#00bfff";
 }
 
 function confirmDispatch() {
-    let paxVal = document.getElementById('slider-dsp-pax').value;
-    let fuelVal = document.getElementById('inp-dsp-fuel').value;
+    // 將數據傳遞到 Performance 頁面
+    document.getElementById('pax-count').value = currentDispatchState.pax;
+    document.getElementById('cargo-fwd').value = currentDispatchState.cgoF;
+    document.getElementById('cargo-aft').value = currentDispatchState.cgoA;
     
-    // 從 DOM 讀取計算好的 Cargo (或者直接讀 Slider)
-    let cgoVal = parseInt(document.getElementById('slider-dsp-cgo').value) || 0;
-
-    if (!fuelVal) {
-        alert("⚠️ Please enter BLOCK FUEL before dispatching.");
-        return;
-    }
-
-    // 計算貨物分艙
-    let fwdRatio = 0.5; 
-    if (currentDispatchState.trimMode === "STD") fwdRatio = 0.55; 
-    if (currentDispatchState.trimMode === "AFT") fwdRatio = 0.40; 
-    if (currentDispatchState.type === "CGO") fwdRatio = 0.50; 
-
-    let fwdCgo = Math.round(cgoVal * fwdRatio);
-    let aftCgo = cgoVal - fwdCgo;
-
-    // 填入 Performance 頁面
-    document.getElementById('pax-count').value = paxVal;
-    document.getElementById('cargo-fwd').value = fwdCgo;
-    document.getElementById('cargo-aft').value = aftCgo;
-    document.getElementById('fuel-total').value = fuelVal;
+    // 自動填入燃油
+    document.getElementById('fuel-total').value = currentDispatchState.fuel;
     
-    // 自動填入 Trip Fuel
-    if(currentDispatchState.calcTripFuel) {
-        document.getElementById('trip-fuel').value = currentDispatchState.calcTripFuel;
-    }
+    // 估算 Trip Fuel (簡單物理)
+    let estTrip = Math.round(currentDispatchState.dist * 12.5);
+    document.getElementById('trip-fuel').value = estTrip;
     
-    // 觸發 Performance 計算
+    // 觸發計算
     updatePaxWeight();
     updateTotalCargo();
     saveInputs();
@@ -447,7 +354,7 @@ function confirmDispatch() {
 }
 
 // ============================================
-// 🛫 OPT 起飛優化邏輯
+// 🛫 OPT 起飛優化邏輯 (與之前相同)
 // ============================================
 function calculateTakeoff() {
     if(!window.perfDB || !window.weightDB) return;
@@ -589,7 +496,7 @@ function calculateTakeoff() {
 }
 
 // ============================================
-// 🛬 OPT 降落矩陣邏輯
+// 🛬 OPT 降落矩陣邏輯 (與之前相同)
 // ============================================
 function calculateLanding() {
     if(!window.perfDB || !window.weightDB) return;
