@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 A330-300 EFB Core v29.0 (Auto-Dispatch)
+// 🧠 A330-300 EFB Core v30.0 (Dynamic Dispatcher)
 // ==========================================
 
 function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
@@ -9,7 +9,7 @@ let completedFlights = JSON.parse(safeGet('a330_roster_v25')) || {};
 
 window.onload = function() {
     // === 自動版本號 ===
-    const baseVersion = "v29.0"; 
+    const baseVersion = "v30.0"; 
     let lastMod = document.lastModified; 
     let dateStr = "";
     try {
@@ -19,11 +19,9 @@ window.onload = function() {
 
     let titleEl = document.querySelector('.nav-header');
     if(titleEl) {
-        // 保留按鈕，只改文字
         let btnHTML = titleEl.innerHTML.match(/<button.*<\/button>/)[0];
         titleEl.innerHTML = `A330 OPT <span style="font-size:12px; color:#00ff00;">${baseVersion} (${dateStr})</span>` + btnHTML;
     }
-    // ================
 
     if (!window.flightDB || !window.perfDB || !window.weightDB || !window.airportDB) {
         alert("⚠️ DB Error! Ensure all JS files are loaded.");
@@ -53,7 +51,7 @@ function renderRoster() {
     list.innerHTML = '';
     if(!window.flightDB) return;
     for (const [k, v] of Object.entries(window.flightDB)) {
-        // 在列表顯示時，隱藏具體數字，只顯示 d 欄位
+        // Roster 列表只顯示靜態描述
         const infoTag = v.type === "PAX" ? "PAX" : (v.type === "CGO" ? "CGO" : "FERRY");
         
         const d = document.createElement('div');
@@ -64,7 +62,7 @@ function renderRoster() {
                 <div class="flight-day">${v.day} | ${k}</div>
                 <div class="flight-route">${v.r}</div>
                 <div style="font-size:12px; color:#00bfff; margin-bottom:4px; font-weight:bold;">
-                    ${infoTag} | ${v.dist || 0} NM | CI: ${v.ci}
+                    ${infoTag} | ${v.dist || 0} NM
                 </div>
                 <div class="flight-desc">${v.d}</div>
             </div>
@@ -110,7 +108,7 @@ function loadFlight(k) {
     applyRunway('to'); 
     applyRunway('ldg');
     
-    // 初始化調度數據
+    // 初始化動態簽派 (生成數據)
     initDispatchSession(k); 
     switchTab('dispatch'); 
 }
@@ -231,41 +229,143 @@ function updateTotalCargo(){
 }
 
 // ============================================
-// 📝 DISPATCH LOGIC (Read-Only Bars)
+// 🧠 DYNAMIC DISPATCH LOGIC (Simulator)
 // ============================================
 
 let currentDispatchState = {
     flightId: null,
     dist: 0,
+    ci: 0,
     pax: 0,
     cgoF: 0,
     cgoA: 0,
-    fuel: 0
+    fuel: 0,
+    warnings: []
 };
+
+// 隨機整數生成器
+function rnd(min, max) { return Math.floor(Math.random() * (max - min + 1) ) + min; }
 
 function initDispatchSession(flightId) {
     const f = window.flightDB[flightId];
     if(!f) return;
 
-    // 1. 讀取數據 (從 Roster)
-    currentDispatchState.flightId = flightId;
-    currentDispatchState.dist = f.dist || 500;
+    currentDispatchState = { flightId: flightId, dist: f.dist, warnings: [] };
     
-    // 讀取隱藏數據，若無則為0
-    currentDispatchState.pax = f.pax !== undefined ? f.pax : 0;
-    currentDispatchState.cgoF = f.cgoF !== undefined ? f.cgoF : 0;
-    currentDispatchState.cgoA = f.cgoA !== undefined ? f.cgoA : 0;
+    // --- STEP A: Runway Analysis (跑道限制) ---
+    // 嘗試從 route 字串解析機場 (LSZH-LEMD)
+    let icao = f.r.split('-');
+    let dep = icao[0] ? icao[0].trim() : null;
+    let arr = icao[1] ? icao[1].trim() : null;
+    
+    let limitLength = 12000; // 預設很長
+    if(window.airportDB && dep && arr && window.airportDB[dep] && window.airportDB[arr]) {
+        // 找出每個機場最長的跑道
+        let maxRwyDep = 0;
+        for(let r in window.airportDB[dep].runways) maxRwyDep = Math.max(maxRwyDep, window.airportDB[dep].runways[r].len);
+        let maxRwyArr = 0;
+        for(let r in window.airportDB[arr].runways) maxRwyArr = Math.max(maxRwyArr, window.airportDB[arr].runways[r].len);
+        
+        limitLength = Math.min(maxRwyDep, maxRwyArr);
+    }
 
-    // 2. 自動計算燃油
-    // 燃油公式: Trip (Dist * 12.5) + Reserves (~5500)
-    let payloadTons = ((currentDispatchState.pax * 77) + currentDispatchState.cgoF + currentDispatchState.cgoA) / 1000;
-    let penalty = payloadTons * 0.04 * f.dist; // 載重懲罰
-    let trip = (f.dist * 12.5) + penalty;
-    let rsv = 2400 + 2500 + 600; // Contingency + Alt + Taxi
-    currentDispatchState.fuel = Math.round(trip + rsv);
+    let rwyFactor = 1.0;
+    let maxCargoStruct = 20000;
+    
+    if (limitLength < 8000) {
+        rwyFactor = 0.60;
+        maxCargoStruct = 5000;
+        currentDispatchState.warnings.push("⚠️ RWY LIMITED PAYLOAD");
+    } else if (limitLength < 9000) {
+        rwyFactor = 0.85;
+        maxCargoStruct = 15000;
+    }
 
-    // 3. 更新 UI
-    document.getElementById('dsp-dist-disp').innerText = f.dist + " NM";
+    // --- STEP B: Pax Generation (乘客) ---
+    // FERRY/MAINT = 0, CGO = Dummy, PAX = Calculated
+    if (f.type === "FERRY" || f.type === "MAINT") {
+        currentDispatchState.pax = 0;
+    } else if (f.type === "CGO") {
+        currentDispatchState.pax = rnd(100, 350); // 模擬客艙貨物重量
+    } else {
+        // Standard PAX
+        let basePax = 441;
+        let lf = 0.80; // Default
+        if (f.profile === "BIZ") lf = rnd(65, 90) / 100;
+        if (f.profile === "LEISURE") lf = rnd(85, 98) / 100;
+        
+        currentDispatchState.pax = Math.floor(basePax * lf * rwyFactor);
+    }
+
+    // --- STEP C: Cargo & Fuel (貨物與燃油) ---
+    // 計算剩餘載重能力
+    let paxWt = currentDispatchState.pax * 77; // 77kg per pax
+    let oew = 129855;
+    let currentZFW = oew + paxWt;
+    let mzfw = 175000;
+    
+    let roomForCargo = mzfw - currentZFW;
+    let targetCargoLimit = Math.min(roomForCargo, maxCargoStruct);
+    
+    // 生成目標貨量
+    let targetCargo = 0;
+    if (f.type === "FERRY" || f.type === "MAINT") {
+        targetCargo = 0;
+    } else if (f.type === "CGO") {
+        targetCargo = targetCargoLimit * (rnd(95, 100)/100);
+    } else {
+        // PAX Flight Cargo
+        let cargoFactor = 0.5;
+        if (f.profile === "BIZ") cargoFactor = rnd(40, 70)/100;
+        if (f.profile === "LEISURE") cargoFactor = rnd(80, 95)/100;
+        
+        targetCargo = Math.floor(targetCargoLimit * cargoFactor);
+    }
+
+    // 生成 CI
+    if (f.type === "FERRY" || f.type === "CGO") {
+        currentDispatchState.ci = rnd(0, 20);
+    } else if (f.dist < 1000 || f.profile === "BIZ") {
+        currentDispatchState.ci = rnd(60, 90);
+    } else {
+        currentDispatchState.ci = rnd(30, 50);
+    }
+
+    // --- STEP D: Trim & Balance (配平) ---
+    // 分配前後艙
+    let fwdRatio = 0.55; // Optimum
+    if (f.type === "CGO" || targetCargo > 18000) fwdRatio = 0.50; // High load balance
+    if (f.profile === "LEISURE") fwdRatio = 0.40; // More bags in aft
+
+    currentDispatchState.cgoF = Math.floor(targetCargo * fwdRatio);
+    currentDispatchState.cgoA = targetCargo - currentDispatchState.cgoF;
+
+    // --- STEP E: Final Validation (最終檢查 TOW) ---
+    // Fuel Calculation
+    let tripFuel = (f.dist * 12.5) + (targetCargo/1000 * 0.04 * f.dist);
+    let rsvFuel = 5500; // Approx reserves
+    let estFuel = Math.round(tripFuel + rsvFuel);
+    currentDispatchState.fuel = estFuel;
+
+    let estZFW = currentZFW + targetCargo;
+    let estTOW = estZFW + estFuel;
+    let mtow = 242000;
+
+    // 如果超重，先減貨
+    if (estTOW > mtow) {
+        let overweight = estTOW - mtow;
+        let reduce = Math.ceil(overweight);
+        
+        // 簡單均分減重
+        let reduceF = Math.ceil(reduce * fwdRatio);
+        let reduceA = reduce - reduceF;
+        
+        currentDispatchState.cgoF = Math.max(0, currentDispatchState.cgoF - reduceF);
+        currentDispatchState.cgoA = Math.max(0, currentDispatchState.cgoA - reduceA);
+        
+        currentDispatchState.warnings.push("⚠️ TOW LIMITED (CARGO REDUCED)");
+    }
+
     updateDispatchDisplay();
 }
 
@@ -275,14 +375,12 @@ function updateDispatchDisplay() {
     // --- PAX Display ---
     let pax = currentDispatchState.pax;
     let paxWt = pax * window.weightDB.pax_unit;
-    // 假設每人 13kg 行李
     let bagWt = pax * 13; 
     let totalPaxLoad = paxWt + bagWt;
 
     document.getElementById('dsp-pax-count').innerText = pax;
     document.getElementById('dsp-pax-total-wt').innerText = totalPaxLoad;
     
-    // Update Pax Bar
     let paxPct = (pax / 441) * 100;
     document.getElementById('bar-pax').style.width = paxPct + "%";
 
@@ -295,7 +393,6 @@ function updateDispatchDisplay() {
     document.getElementById('dsp-cgo-fwd-val').innerText = cgoF;
     document.getElementById('dsp-cgo-aft-val').innerText = cgoA;
 
-    // Update Cargo Bars & Ratios
     let pctF = totalCgo > 0 ? Math.round((cgoF / totalCgo) * 100) : 50;
     let pctA = totalCgo > 0 ? (100 - pctF) : 50;
 
@@ -304,6 +401,10 @@ function updateDispatchDisplay() {
     document.getElementById('dsp-cgo-fwd-pct').innerText = pctF + "%";
     document.getElementById('dsp-cgo-aft-pct').innerText = pctA + "%";
 
+    // --- CI Display (New) ---
+    let ciEl = document.getElementById('dsp-ci-val');
+    if(ciEl) ciEl.innerText = currentDispatchState.ci;
+
     // --- Fuel & Weight ---
     let fuel = currentDispatchState.fuel;
     document.getElementById('dsp-est-fuel').innerText = fuel;
@@ -311,7 +412,6 @@ function updateDispatchDisplay() {
     let totalLoad = totalPaxLoad + totalCgo;
     let zfw = window.weightDB.oew + totalLoad;
     let tow = zfw + fuel;
-    // Trip Fuel approx (Dist * 12.5)
     let tripBurn = Math.round(currentDispatchState.dist * 12.5);
     let lw = tow - tripBurn;
 
@@ -319,13 +419,20 @@ function updateDispatchDisplay() {
     document.getElementById('dsp-res-tow').innerText = Math.round(tow);
     document.getElementById('dsp-res-lw').innerText = Math.round(lw);
 
-    // Limit Check
+    // Limit Check (Visual only)
     let limitTOW = 242000; 
-    // 簡單跑道檢查 (To simulate logic)
-    let toLen = parseFloat(document.getElementById('to-rwy-len').value) || 10000;
-    if (toLen < 9000) limitTOW = 220000;
-
     document.getElementById('dsp-limit-tow').innerText = (limitTOW/1000) + "T";
+    
+    // Warnings
+    let statusEl = document.getElementById('dsp-rwy-status');
+    if (currentDispatchState.warnings.length > 0) {
+        statusEl.innerText = currentDispatchState.warnings.join(" | ");
+        statusEl.style.color = "#f1c40f";
+    } else {
+        statusEl.innerText = "UNRESTRICTED";
+        statusEl.style.color = "#2ecc71";
+    }
+
     let underload = limitTOW - tow;
     let ulEl = document.getElementById('dsp-underload');
     ulEl.innerText = (underload >= 0 ? "+" : "") + Math.round(underload);
@@ -333,19 +440,14 @@ function updateDispatchDisplay() {
 }
 
 function confirmDispatch() {
-    // 將數據傳遞到 Performance 頁面
     document.getElementById('pax-count').value = currentDispatchState.pax;
     document.getElementById('cargo-fwd').value = currentDispatchState.cgoF;
     document.getElementById('cargo-aft').value = currentDispatchState.cgoA;
-    
-    // 自動填入燃油
     document.getElementById('fuel-total').value = currentDispatchState.fuel;
     
-    // 估算 Trip Fuel (簡單物理)
     let estTrip = Math.round(currentDispatchState.dist * 12.5);
     document.getElementById('trip-fuel').value = estTrip;
     
-    // 觸發計算
     updatePaxWeight();
     updateTotalCargo();
     saveInputs();
@@ -353,8 +455,14 @@ function confirmDispatch() {
     switchTab('takeoff');
 }
 
+// ... (以下是原本的 OPT/Landing 函數，保持不變) ...
+// 為了版面整潔，請保留原本 calculateTakeoff, calculateLanding, saveInputs, loadInputs 等函數
+// 這裡省略重複代碼，請直接使用原本的內容
+// ... 
+// 必須包含 calculateTakeoff, calculateLanding, saveInputs, loadInputs, clearAllData
+// ...
 // ============================================
-// 🛫 OPT 起飛優化邏輯 (與之前相同)
+// 🛫 OPT 起飛優化邏輯
 // ============================================
 function calculateTakeoff() {
     if(!window.perfDB || !window.weightDB) return;
@@ -496,7 +604,7 @@ function calculateTakeoff() {
 }
 
 // ============================================
-// 🛬 OPT 降落矩陣邏輯 (與之前相同)
+// 🛬 OPT 降落矩陣邏輯
 // ============================================
 function calculateLanding() {
     if(!window.perfDB || !window.weightDB) return;
