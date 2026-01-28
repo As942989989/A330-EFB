@@ -1,5 +1,5 @@
 /* ==========================================
-   A330-300 EFB Stylesheet v27.0
+   A330-300 EFB Stylesheet v27.1 (Optimized)
    ========================================== */
 
 /* --- 全局設定 --- */
@@ -288,7 +288,7 @@ input, select {
     border-radius: 4px; 
 }
 
-/* --- [v27.0 New] 降落矩陣表格 (Landing Matrix) --- */
+/* --- [修正與優化] 降落矩陣表格 (Landing Matrix) --- */
 .matrix-table { 
     width: 100%; 
     border-collapse: collapse; 
@@ -309,6 +309,12 @@ input, select {
     text-align: center; 
     padding: 6px 4px; 
     border-bottom: 1px solid #222; 
+}
+
+/* [新增] 防止狀態欄在手機上折行 */
+.matrix-table td:last-child {
+    white-space: nowrap; 
+    font-weight: bold;
 }
 
 .matrix-safe { 
