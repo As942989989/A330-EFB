@@ -15,13 +15,58 @@
     <script src="weights.js"></script>
     <script src="airports.js"></script>
 
-    <div class="nav-header">A330 OPT v27<button class="reset-btn" onclick="clearAllData()">RESET</button></div>
+    <div class="nav-header">A330 OPT v28<button class="reset-btn" onclick="clearAllData()">RESET</button></div>
 
     <div class="content-container">
         <div id="tab-roster" class="tab-content active">
             <div id="roster-list"></div>
             <div style="text-align:center;color:#555;font-size:12px;margin-top:20px;">— END OF ROSTER —</div>
         </div>
+        
+<div id="tab-dispatch" class="tab-content">
+    <div class="current-flight-banner" style="border-left-color: #f1c40f;">
+        <div style="font-size:12px;color:#aaa;">DISPATCH RELEASE</div>
+        <div id="dsp-flight" style="color:#fff;font-weight:bold;">NO FLIGHT</div>
+    </div>
+
+    <div class="section-header">RUNWAY & RANGE ANALYSIS</div>
+    <div class="data-grid" style="grid-template-columns: 1fr 1fr; margin-bottom:10px;">
+        <div style="border:1px solid #333; padding:10px; border-radius:4px;">
+            <div style="font-size:10px; color:#888;">RUNWAY PERF</div>
+            <div id="dsp-rwy-status" style="font-weight:bold; font-size:14px; margin-top:5px;">--</div>
+        </div>
+        <div style="border:1px solid #333; padding:10px; border-radius:4px;">
+            <div style="font-size:10px; color:#888;">RANGE / FUEL</div>
+            <div id="dsp-fuel-status" style="font-weight:bold; font-size:14px; margin-top:5px;">--</div>
+        </div>
+    </div>
+
+    <div class="section-header">YIELD & LOAD GEN</div>
+    <div class="input-row" style="margin-top:10px;">
+        <label>PAX ADJ (<span id="dsp-pax-val">0</span>)</label>
+        <input type="range" id="dsp-pax-slider" min="0" max="441" step="1" oninput="updateFromSlider()" style="width:55%;">
+    </div>
+
+    <div class="result-box">
+         <div class="data-grid">
+            <div class="data-item"><div>PAX WT</div><div id="dsp-pax-wt" style="color:#00bfff;">0</div></div>
+            <div class="data-item"><div>BAGS</div><div id="dsp-bag-wt">0</div></div>
+            <div class="data-item"><div>CARGO</div><div id="dsp-cgo-wt">0</div></div>
+        </div>
+        <div style="border-bottom:1px solid #333; margin:10px 0;"></div>
+        <div style="display:flex; justify-content:space-between;">
+             <span style="font-size:12px;color:#888;">TOTAL TRAFFIC LOAD</span>
+             <span id="dsp-total-load" style="font-size:16px;color:#fff;font-weight:bold;">0</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-top:5px;">
+             <span style="font-size:12px;color:#888;">UNDERLOAD (+/-)</span>
+             <span id="dsp-underload" style="font-size:16px;color:#00bfff;font-weight:bold;">0</span>
+        </div>
+    </div>
+
+    <button id="btn-confirm-dispatch" class="btn-calc" onclick="confirmDispatch()" style="background-color:#2ecc71;">CONFIRM & DISPATCH</button>
+    <div style="height:50px;"></div>
+</div>
 
         <div id="tab-takeoff" class="tab-content">
             <div class="current-flight-banner">
@@ -176,11 +221,12 @@
         </div>
     </div>
 
-    <div class="bottom-nav">
-        <button class="nav-btn active" onclick="switchTab('roster')" id="btn-roster"><span class="nav-icon">📅</span><span>ROSTER</span></button>
-        <button class="nav-btn" onclick="switchTab('takeoff')" id="btn-takeoff"><span class="nav-icon">🛫</span><span>TAKEOFF</span></button>
-        <button class="nav-btn" onclick="switchTab('landing')" id="btn-landing"><span class="nav-icon">🛬</span><span>LANDING</span></button>
-    </div>
+    <div class="bottom-nav" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
+    <button class="nav-btn active" onclick="switchTab('roster')" id="btn-roster"><span class="nav-icon">📅</span><span>ROSTER</span></button>
+    <button class="nav-btn" onclick="switchTab('dispatch')" id="btn-dispatch"><span class="nav-icon">📝</span><span>DSP</span></button>
+    <button class="nav-btn" onclick="switchTab('takeoff')" id="btn-takeoff"><span class="nav-icon">🛫</span><span>PERF</span></button>
+    <button class="nav-btn" onclick="switchTab('landing')" id="btn-landing"><span class="nav-icon">🛬</span><span>ARR</span></button>
+</div>
     
     <script src="app.js"></script>
 </body>
