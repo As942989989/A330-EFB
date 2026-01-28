@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 A330-300 EFB Core v28.2 (Fixed Logic)
+// 🧠 A330-300 EFB Core v28.3 (Patched Logic)
 // ==========================================
 
 function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
@@ -149,23 +149,46 @@ function applyRunway(prefix) {
 }
 
 // --------------------------------------------
-// Physics Helper Functions
+// Physics Helper Functions (FIXED)
 // --------------------------------------------
+
+// [修復] 差值計算增加邊界檢查，防止極端重量導致崩潰或錯誤讀數
 function interpolate(w, t) {
+    // 1. 低於最小值 (Empty/Ferry)：鎖定最小值
+    if (w <= t[0][0]) {
+        let l = t[0];
+        return {v1: l[1], vr: l[2], v2: l[3]};
+    }
+    // 2. 高於最大值 (Overweight)：鎖定最大值
+    if (w >= t[t.length-1][0]) {
+        let l = t[t.length-1];
+        return {v1: l[1], vr: l[2], v2: l[3]};
+    }
+
+    // 3. 正常區間
     for(let i=0; i<t.length-1; i++) {
-        if(w>=t[i][0] && w<=t[i+1][0]) {
+        if(w >= t[i][0] && w <= t[i+1][0]) {
             let r = (w-t[i][0])/(t[i+1][0]-t[i][0]);
-            return {v1: t[i][1]+r*(t[i+1][1]-t[i][1]), vr: t[i][2]+r*(t[i+1][2]-t[i][2]), v2: t[i][3]+r*(t[i+1][3]-t[i][3])};
+            return {
+                v1: Math.round(t[i][1]+r*(t[i+1][1]-t[i][1])), 
+                vr: Math.round(t[i][2]+r*(t[i+1][2]-t[i][2])), 
+                v2: Math.round(t[i][3]+r*(t[i+1][3]-t[i][3]))
+            };
         }
     }
+    // Fallback
     let l=t[t.length-1]; return {v1:l[1],vr:l[2],v2:l[3]};
 }
 
+// [修復] VLS 差值同樣增加邊界檢查
 function interpolateVLS(w, t) {
+    if (w <= t[0][0]) return t[0][1];
+    if (w >= t[t.length-1][0]) return t[t.length-1][1];
+
     for(let i=0; i<t.length-1; i++) {
-        if(w>=t[i][0] && w<=t[i+1][0]) {
+        if(w >= t[i][0] && w <= t[i+1][0]) {
             let r = (w-t[i][0])/(t[i+1][0]-t[i][0]);
-            return t[i][1]+r*(t[i+1][1]-t[i][1]);
+            return Math.round(t[i][1]+r*(t[i+1][1]-t[i][1]));
         }
     }
     return 160;
