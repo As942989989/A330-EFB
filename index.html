@@ -101,16 +101,16 @@
             
             <div class="input-row"><label>OAT (°C)</label><input type="number" id="to-oat" placeholder="MANUAL" oninput="saveInputs()"></div>
 
-            <div class="section-header">LOAD & FUEL (KG)</div>
-            <div class="input-row"><label>PAX (77KG)</label><input type="number" id="pax-count" oninput="updatePaxWeight(); saveInputs();"></div>
+                        <div class="section-header">LOAD & FUEL (KG)</div>
+            <div class="input-row"><label>PAX (77KG)</label><input type="number" id="pax-count" min="0" oninput="updatePaxWeight(); saveInputs();"></div>
             <div style="text-align:right; margin-top:-8px; margin-bottom:8px; font-size:11px; color:#666;">
                 TOTAL PAX WT: <span id="pax-weight-disp" style="color:#00bfff;">0</span> KG
             </div>
 
-            <div class="input-row"><label>CARGO FWD</label><input type="number" id="cargo-fwd" placeholder="KG" oninput="updateTotalCargo(); saveInputs();"></div>
-            <div class="input-row"><label>CARGO AFT</label><input type="number" id="cargo-aft" placeholder="KG" oninput="updateTotalCargo(); saveInputs();"></div>
-            <div class="input-row"><label>FUEL TOTAL</label><input type="number" id="fuel-total" placeholder="KG" oninput="saveInputs()"></div>
-            <div class="input-row"><label style="color:#ff9900;">TRIP FUEL</label><input type="number" id="trip-fuel" placeholder="KG" style="border-color:#ff9900;" oninput="saveInputs()"></div>
+            <div class="input-row"><label>CARGO FWD</label><input type="number" id="cargo-fwd" min="0" placeholder="KG" oninput="updateTotalCargo(); saveInputs();"></div>
+            <div class="input-row"><label>CARGO AFT</label><input type="number" id="cargo-aft" min="0" placeholder="KG" oninput="updateTotalCargo(); saveInputs();"></div>
+            <div class="input-row"><label>FUEL TOTAL</label><input type="number" id="fuel-total" min="0" placeholder="KG" oninput="saveInputs()"></div>
+            <div class="input-row"><label style="color:#ff9900;">TRIP FUEL</label><input type="number" id="trip-fuel" min="0" placeholder="KG" style="border-color:#ff9900;" oninput="saveInputs()"></div>
             
             <input type="hidden" id="pax-weight"><input type="hidden" id="cargo-total">
 
