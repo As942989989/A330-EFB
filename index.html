@@ -34,26 +34,34 @@
         <div style="border:1px solid #333; padding:10px; border-radius:4px;">
             <div style="font-size:10px; color:#888;">RWY LIMIT (TOW)</div>
             <div id="dsp-limit-tow" style="font-weight:bold; font-size:16px; margin-top:5px; color:#fff;">Checking...</div>
+            <div id="dsp-rwy-status" style="font-size:10px; margin-top:3px;">--</div>
         </div>
         <div style="border:1px solid #333; padding:10px; border-radius:4px;">
             <div style="font-size:10px; color:#888;">RANGE / DIST</div>
             <div id="dsp-dist-disp" style="font-weight:bold; font-size:16px; margin-top:5px; color:#00bfff;">-- NM</div>
         </div>
     </div>
-    <div id="dsp-alert-box" style="display:none; background:#300; border:1px solid red; color:#ff5555; font-size:12px; padding:8px; margin-bottom:10px;">
-        ⚠️ PERFORMANCE LIMITED: PAYLOAD REDUCED
-    </div>
 
     <div class="section-header">PAYLOAD CONTROL</div>
     
-    <div class="input-row" style="margin-top:10px;">
-        <label id="lbl-dsp-pax">PAX (<span id="val-dsp-pax">0</span>)</label>
-        <input type="range" id="slider-dsp-pax" min="0" max="441" step="1" oninput="updateDispatchCalc()" style="width:55%;">
+    <div class="input-row" style="margin-top:10px; display:block;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+            <label id="lbl-dsp-pax" style="width:auto;">PAX: <span id="val-dsp-pax" style="color:#00bfff">0</span></label>
+            <span style="font-size:11px; color:#666;">WT: <span id="dsp-pax-wt">0</span> + <span id="dsp-bag-wt">0</span> (BAG)</span>
+        </div>
+        <input type="range" id="slider-dsp-pax" min="0" max="441" step="1" oninput="updateDispatchCalc()" style="width:100%;">
     </div>
 
-    <div class="input-row" style="margin-top:5px;">
-        <label>CARGO (<span id="val-dsp-cgo">0</span>T)</label>
-        <input type="range" id="slider-dsp-cgo" min="0" max="25000" step="100" oninput="updateDispatchCalc()" style="width:55%;">
+    <div class="input-row" style="margin-top:15px; display:block;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+            <label style="width:auto;">CARGO: <span id="val-dsp-cgo" style="color:#00bfff">0</span> KG</label>
+            <span style="font-size:11px; color:#666;">WT: <span id="dsp-cgo-wt">0</span></span>
+        </div>
+        <input type="range" id="slider-dsp-cgo" min="0" max="25000" step="100" oninput="updateDispatchCalc()" style="width:100%;">
+    </div>
+
+    <div style="text-align:right; font-size:12px; color:#aaa; margin-top:5px;">
+        TOTAL PAYLOAD: <span id="dsp-total-load" style="color:#fff;">0</span> KG
     </div>
 
     <div class="section-header">FUEL PLANNING</div>
@@ -62,8 +70,8 @@
         <input type="number" id="inp-dsp-fuel" placeholder="KG" oninput="updateDispatchCalc()" style="border-color:#ff9900;">
     </div>
     <div style="display:flex; justify-content:space-between; font-size:11px; color:#888; margin-top:-5px; margin-bottom:10px;">
-        <span>MIN REQ: <span id="dsp-min-fuel" style="color:#ccc;">0</span></span>
-        <span>TRIP: <span id="dsp-trip-fuel" style="color:#00bfff;">0</span></span>
+        <span id="dsp-fuel-status">MIN: 0</span>
+        <span>UNDERLOAD: <span id="dsp-underload" style="font-weight:bold;">0</span></span>
     </div>
 
     <div class="result-box">
