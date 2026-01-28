@@ -26,45 +26,62 @@
 <div id="tab-dispatch" class="tab-content">
     <div class="current-flight-banner" style="border-left-color: #f1c40f;">
         <div style="font-size:12px;color:#aaa;">DISPATCH RELEASE</div>
-        <div id="dsp-flight" style="color:#fff;font-weight:bold;">NO FLIGHT</div>
+        <div id="dsp-flight" style="color:#fff;font-weight:bold;">NO FLIGHT SELECTED</div>
     </div>
 
-    <div class="section-header">RUNWAY & RANGE ANALYSIS</div>
+    <div class="section-header">PERFORMANCE & LIMITS</div>
     <div class="data-grid" style="grid-template-columns: 1fr 1fr; margin-bottom:10px;">
         <div style="border:1px solid #333; padding:10px; border-radius:4px;">
-            <div style="font-size:10px; color:#888;">RUNWAY PERF</div>
-            <div id="dsp-rwy-status" style="font-weight:bold; font-size:14px; margin-top:5px;">--</div>
+            <div style="font-size:10px; color:#888;">RWY LIMIT (TOW)</div>
+            <div id="dsp-limit-tow" style="font-weight:bold; font-size:16px; margin-top:5px; color:#fff;">Checking...</div>
         </div>
         <div style="border:1px solid #333; padding:10px; border-radius:4px;">
-            <div style="font-size:10px; color:#888;">RANGE / FUEL</div>
-            <div id="dsp-fuel-status" style="font-weight:bold; font-size:14px; margin-top:5px;">--</div>
+            <div style="font-size:10px; color:#888;">RANGE / DIST</div>
+            <div id="dsp-dist-disp" style="font-weight:bold; font-size:16px; margin-top:5px; color:#00bfff;">-- NM</div>
         </div>
     </div>
+    <div id="dsp-alert-box" style="display:none; background:#300; border:1px solid red; color:#ff5555; font-size:12px; padding:8px; margin-bottom:10px;">
+        ⚠️ PERFORMANCE LIMITED: PAYLOAD REDUCED
+    </div>
 
-    <div class="section-header">YIELD & LOAD GEN</div>
+    <div class="section-header">PAYLOAD CONTROL</div>
+    
     <div class="input-row" style="margin-top:10px;">
-        <label>PAX ADJ (<span id="dsp-pax-val">0</span>)</label>
-        <input type="range" id="dsp-pax-slider" min="0" max="441" step="1" oninput="updateFromSlider()" style="width:55%;">
+        <label id="lbl-dsp-pax">PAX (<span id="val-dsp-pax">0</span>)</label>
+        <input type="range" id="slider-dsp-pax" min="0" max="441" step="1" oninput="updateDispatchCalc()" style="width:55%;">
+    </div>
+
+    <div class="input-row" style="margin-top:5px;">
+        <label>CARGO (<span id="val-dsp-cgo">0</span>T)</label>
+        <input type="range" id="slider-dsp-cgo" min="0" max="25000" step="100" oninput="updateDispatchCalc()" style="width:55%;">
+    </div>
+
+    <div class="section-header">FUEL PLANNING</div>
+    <div class="input-row">
+        <label>BLOCK FUEL</label>
+        <input type="number" id="inp-dsp-fuel" placeholder="KG" oninput="updateDispatchCalc()" style="border-color:#ff9900;">
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:11px; color:#888; margin-top:-5px; margin-bottom:10px;">
+        <span>MIN REQ: <span id="dsp-min-fuel" style="color:#ccc;">0</span></span>
+        <span>TRIP: <span id="dsp-trip-fuel" style="color:#00bfff;">0</span></span>
     </div>
 
     <div class="result-box">
-         <div class="data-grid">
-            <div class="data-item"><div>PAX WT</div><div id="dsp-pax-wt" style="color:#00bfff;">0</div></div>
-            <div class="data-item"><div>BAGS</div><div id="dsp-bag-wt">0</div></div>
-            <div class="data-item"><div>CARGO</div><div id="dsp-cgo-wt">0</div></div>
+         <div class="data-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+            <div class="data-item"><div>ZFW</div><div id="dsp-res-zfw" style="color:#fff;">0</div></div>
+            <div class="data-item"><div>TOW</div><div id="dsp-res-tow">0</div></div>
+            <div class="data-item"><div>LW</div><div id="dsp-res-lw">0</div></div>
         </div>
+        
         <div style="border-bottom:1px solid #333; margin:10px 0;"></div>
-        <div style="display:flex; justify-content:space-between;">
-             <span style="font-size:12px;color:#888;">TOTAL TRAFFIC LOAD</span>
-             <span id="dsp-total-load" style="font-size:16px;color:#fff;font-weight:bold;">0</span>
-        </div>
-        <div style="display:flex; justify-content:space-between; margin-top:5px;">
-             <span style="font-size:12px;color:#888;">UNDERLOAD (+/-)</span>
-             <span id="dsp-underload" style="font-size:16px;color:#00bfff;font-weight:bold;">0</span>
+        
+        <div class="data-grid" style="grid-template-columns: 1fr 1fr;">
+            <div class="data-item"><div>PROFILE</div><div id="dsp-profile-tag" style="color:#ffcc00;">--</div></div>
+            <div class="data-item"><div>TRIM POLICY</div><div id="dsp-trim-tag">STD</div></div>
         </div>
     </div>
 
-    <button id="btn-confirm-dispatch" class="btn-calc" onclick="confirmDispatch()" style="background-color:#2ecc71;">CONFIRM & DISPATCH</button>
+    <button id="btn-confirm-dispatch" class="btn-calc" onclick="confirmDispatch()" style="background-color:#2ecc71; margin-top:15px;">CONFIRM & LOAD</button>
     <div style="height:50px;"></div>
 </div>
 
