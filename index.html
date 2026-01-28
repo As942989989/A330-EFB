@@ -42,36 +42,52 @@
         </div>
     </div>
 
-    <div class="section-header">PAYLOAD CONTROL</div>
+    <div class="section-header">PAYLOAD (READ ONLY)</div>
     
-    <div class="input-row" style="margin-top:10px; display:block;">
+    <div style="margin-top:10px;">
         <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-            <label id="lbl-dsp-pax" style="width:auto;">PAX: <span id="val-dsp-pax" style="color:#00bfff">0</span></label>
-            <span style="font-size:11px; color:#666;">WT: <span id="dsp-pax-wt">0</span> + <span id="dsp-bag-wt">0</span> (BAG)</span>
+            <label style="width:auto; color:#00bfff;">PASSENGERS</label>
+            <span style="font-size:12px; font-weight:bold; color:#fff;"><span id="dsp-pax-count">0</span> <span style="color:#666; font-size:10px;">PAX</span></span>
         </div>
-        <input type="range" id="slider-dsp-pax" min="0" max="441" step="1" oninput="updateDispatchCalc()" style="width:100%;">
+        <div class="bar-container">
+            <div id="bar-pax" class="bar-fill-pax"></div>
+        </div>
+        <div style="text-align:right; font-size:10px; color:#666; margin-top:2px;">
+            CAPACITY: 441 | WT: <span id="dsp-pax-total-wt">0</span> KG
+        </div>
     </div>
 
-    <div class="input-row" style="margin-top:15px; display:block;">
+    <div style="margin-top:15px;">
         <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-            <label style="width:auto;">CARGO: <span id="val-dsp-cgo" style="color:#00bfff">0</span> KG</label>
-            <span style="font-size:11px; color:#666;">WT: <span id="dsp-cgo-wt">0</span></span>
+            <label style="width:auto; color:#e67e22;">CARGO DISTRIBUTION</label>
+            <span style="font-size:12px; font-weight:bold; color:#fff;"><span id="dsp-cgo-total">0</span> <span style="color:#666; font-size:10px;">KG</span></span>
         </div>
-        <input type="range" id="slider-dsp-cgo" min="0" max="25000" step="100" oninput="updateDispatchCalc()" style="width:100%;">
-    </div>
-
-    <div style="text-align:right; font-size:12px; color:#aaa; margin-top:5px;">
-        TOTAL PAYLOAD: <span id="dsp-total-load" style="color:#fff;">0</span> KG
+        <div class="bar-container" style="border:1px solid #555;">
+            <div class="bar-split">
+                <div id="bar-cgo-fwd" class="bar-fwd" style="width:50%"></div>
+                <div id="bar-cgo-aft" class="bar-aft" style="width:50%"></div>
+            </div>
+        </div>
+        <div class="ratio-label">
+            <span style="color:#e67e22;">FWD: <span id="dsp-cgo-fwd-val">0</span> (<span id="dsp-cgo-fwd-pct">0%</span>)</span>
+            <span style="color:#2ecc71;">AFT: <span id="dsp-cgo-aft-val">0</span> (<span id="dsp-cgo-aft-pct">0%</span>)</span>
+        </div>
     </div>
 
     <div class="section-header">FUEL PLANNING</div>
-    <div class="input-row">
-        <label>BLOCK FUEL</label>
-        <input type="number" id="inp-dsp-fuel" placeholder="KG" oninput="updateDispatchCalc()" style="border-color:#ff9900;">
+    <div style="background:#111; padding:12px; border-radius:6px; border:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+            <div style="font-size:10px; color:#888;">ESTIMATED BLOCK FUEL</div>
+            <div style="font-size:10px; color:#555; margin-top:2px;">(TRIP + RSV + TAXI)</div>
+        </div>
+        <div style="text-align:right;">
+            <div id="dsp-est-fuel" style="font-size:20px; font-weight:bold; color:#00ff00;">0</div>
+            <div style="font-size:10px; color:#00ff00;">KG</div>
+        </div>
     </div>
-    <div style="display:flex; justify-content:space-between; font-size:11px; color:#888; margin-top:-5px; margin-bottom:10px;">
-        <span id="dsp-fuel-status">MIN: 0</span>
-        <span>UNDERLOAD: <span id="dsp-underload" style="font-weight:bold;">0</span></span>
+    
+    <div style="text-align:right; font-size:11px; color:#888; margin-top:5px; margin-bottom:10px;">
+        UNDERLOAD: <span id="dsp-underload" style="font-weight:bold;">0</span>
     </div>
 
     <div class="result-box">
@@ -79,13 +95,6 @@
             <div class="data-item"><div>ZFW</div><div id="dsp-res-zfw" style="color:#fff;">0</div></div>
             <div class="data-item"><div>TOW</div><div id="dsp-res-tow">0</div></div>
             <div class="data-item"><div>LW</div><div id="dsp-res-lw">0</div></div>
-        </div>
-        
-        <div style="border-bottom:1px solid #333; margin:10px 0;"></div>
-        
-        <div class="data-grid" style="grid-template-columns: 1fr 1fr;">
-            <div class="data-item"><div>PROFILE</div><div id="dsp-profile-tag" style="color:#ffcc00;">--</div></div>
-            <div class="data-item"><div>TRIM POLICY</div><div id="dsp-trim-tag">STD</div></div>
         </div>
     </div>
 
