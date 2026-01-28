@@ -229,7 +229,7 @@ input, select {
     margin-top: 15px; 
 }
 
-/* --- 跑道資訊顯示列 --- */
+/* --- 跑道資訊顯示列 (唯讀模式) --- */
 .rwy-info-row { 
     display: flex; 
     justify-content: space-between; 
@@ -311,8 +311,30 @@ input, select {
     border-bottom: 1px solid #222; 
 }
 
+/* [新增] 防止狀態欄在手機上折行 */
 .matrix-table td:last-child {
     white-space: nowrap; 
+    font-weight: bold;
+}
+
+.matrix-safe { 
+    color: #2ecc71 !important; 
+    font-weight: bold; 
+}
+
+.matrix-warn { 
+    color: #f1c40f !important; 
+}
+
+.matrix-fail { 
+    color: #e74c3c !important; 
+}
+
+.matrix-header { 
+    font-size: 11px; 
+    color: #00bfff; 
+    text-align: left; 
+    padding-top: 8px; 
     font-weight: bold;
 }
 
