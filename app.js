@@ -1,21 +1,16 @@
 // ==========================================
-// 🧠 A330-300 EFB Core v31.0 (Persistent Dispatch)
+// 📱 A330 EFB Main Controller (UI & Events)
 // ==========================================
 
-function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
-function safeSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
-function safeRem(k){try{localStorage.removeItem(k)}catch(e){}}
 let completedFlights = JSON.parse(safeGet('a330_roster_v25')) || {};
 
 window.onload = function() {
-    // === 自動版本號 ===
-    const baseVersion = "v31.0"; 
-    let lastMod = document.lastModified; 
-    let dateStr = "";
+    const baseVersion = "v32.0 (Modular)"; 
+    let dateStr = "Dev";
     try {
-        let d = new Date(lastMod);
+        let d = new Date(document.lastModified);
         dateStr = (d.getMonth()+1) + "/" + d.getDate() + " " + d.getHours() + ":" + String(d.getMinutes()).padStart(2, '0');
-    } catch(e) { dateStr = "Dev"; }
+    } catch(e) {}
 
     let titleEl = document.querySelector('.nav-header');
     if(titleEl) {
@@ -42,9 +37,7 @@ function switchTab(t) {
     if(btn) btn.classList.add('active');
 }
 
-// --------------------------------------------
-// Roster Functions
-// --------------------------------------------
+// --- Roster UI ---
 function renderRoster() {
     const list = document.getElementById('roster-list');
     if(!list) return;
@@ -107,11 +100,11 @@ function loadFlight(k) {
     applyRunway('to'); 
     applyRunway('ldg');
     
-    // 初始化動態簽派 (帶有存檔讀取功能)
     initDispatchSession(k); 
     switchTab('dispatch'); 
 }
 
+// --- Runway UI ---
 function populateRunways(selectId, icao) {
     const sel = document.getElementById(selectId);
     if(!sel) return;
@@ -160,252 +153,11 @@ function applyRunway(prefix) {
     }
 }
 
-// --------------------------------------------
-// Physics Helper Functions
-// --------------------------------------------
-function interpolate(w, t) {
-    if (w <= t[0][0]) { let l = t[0]; return {v1: l[1], vr: l[2], v2: l[3]}; }
-    if (w >= t[t.length-1][0]) { let l = t[t.length-1]; return {v1: l[1], vr: l[2], v2: l[3]}; }
-
-    for(let i=0; i<t.length-1; i++) {
-        if(w >= t[i][0] && w <= t[i+1][0]) {
-            let r = (w-t[i][0])/(t[i+1][0]-t[i][0]);
-            return {
-                v1: Math.round(t[i][1]+r*(t[i+1][1]-t[i][1])), 
-                vr: Math.round(t[i][2]+r*(t[i+1][2]-t[i][2])), 
-                v2: Math.round(t[i][3]+r*(t[i+1][3]-t[i][3]))
-            };
-        }
-    }
-    let l=t[t.length-1]; return {v1:l[1],vr:l[2],v2:l[3]};
-}
-
-function interpolateVLS(w, t) {
-    if (w <= t[0][0]) return t[0][1];
-    if (w >= t[t.length-1][0]) return t[t.length-1][1];
-    for(let i=0; i<t.length-1; i++) {
-        if(w >= t[i][0] && w <= t[i+1][0]) {
-            let r = (w-t[i][0])/(t[i+1][0]-t[i][0]);
-            return Math.round(t[i][1]+r*(t[i+1][1]-t[i][1]));
-        }
-    }
-    return 160;
-}
-
-function calculateTHS(cg) {
-    let tp = window.perfDB.trim_physics;
-    let val = (tp.ref_cg - cg) * tp.step; 
-    let dir = (val >= 0) ? "UP " : "DN ";
-    return { deg: Math.abs(val), text: dir + Math.abs(val).toFixed(1), raw: val };
-}
-
-function convertToIF(degRaw) {
-    let result = (degRaw > 0) ? 15 + (degRaw * 8) : 15 - (Math.abs(degRaw) * 8);
-    return Math.max(0, Math.min(100, Math.round(result)));
-}
-
-function computeInternalZFWCG() {
-    const BASE_CG = 24.0;
-    let paxWt = parseFloat(document.getElementById('pax-weight').value) || 0;
-    let fwdWt = parseFloat(document.getElementById('cargo-fwd').value) || 0;
-    let aftWt = parseFloat(document.getElementById('cargo-aft').value) || 0;
-    let cg = BASE_CG + (paxWt * 0.00020) + (fwdWt * -0.00050) + (aftWt * 0.00070);
-    return Math.max(18, Math.min(42, cg));
-}
-
-function updatePaxWeight(){
-    if(!window.weightDB) return;
-    let count = parseFloat(document.getElementById("pax-count").value) || 0;
-    let unit = window.weightDB.pax_unit; 
-    let totalWeight = count * unit;
-    document.getElementById("pax-weight").value = totalWeight;
-    let dispEl = document.getElementById("pax-weight-disp");
-    if(dispEl) dispEl.innerText = totalWeight;
-}
-
-function updateTotalCargo(){
-    document.getElementById("cargo-total").value=(parseFloat(document.getElementById("cargo-fwd").value)||0)+(parseFloat(document.getElementById("cargo-aft").value)||0);
-}
-
-// ============================================
-// 🧠 DYNAMIC DISPATCH LOGIC (Persistent)
-// ============================================
-
-let currentDispatchState = {
-    flightId: null,
-    dist: 0,
-    ci: 0,
-    pax: 0,
-    cgoF: 0,
-    cgoA: 0,
-    fuel: 0,
-    warnings: [],
-    isSaved: false
-};
-
-// 隨機整數生成器
-function rnd(min, max) { return Math.floor(Math.random() * (max - min + 1) ) + min; }
-
-// 本地存儲存取 Key
-function getStorageKey(flightId) {
-    return 'dsp_save_' + flightId;
-}
-
-function initDispatchSession(flightId) {
-    const f = window.flightDB[flightId];
-    if(!f) return;
-
-    currentDispatchState.flightId = flightId;
-    currentDispatchState.dist = f.dist;
-
-    // 1. 嘗試讀取存檔
-    let savedData = safeGet(getStorageKey(flightId));
-    
-    if (savedData) {
-        // [A] 有存檔 -> 載入舊數據
-        let parsed = JSON.parse(savedData);
-        currentDispatchState = { ...currentDispatchState, ...parsed };
-        currentDispatchState.isSaved = true; // 標記為舊資料
-        console.log("Loaded saved dispatch for " + flightId);
-    } else {
-        // [B] 無存檔 -> 生成新數據
-        generateNewDispatch(flightId);
-    }
-
-    updateDispatchDisplay();
-}
-
-// 強制重新簽派按鈕功能
-function forceNewDispatch() {
-    if(!currentDispatchState.flightId) return;
-    if(confirm("RE-CALCULATE LOADSHEET?\nThis will generate new Pax/Cargo/Fuel figures.")) {
-        generateNewDispatch(currentDispatchState.flightId);
-        updateDispatchDisplay();
-    }
-}
-
-// 核心生成邏輯 (獨立出來)
-function generateNewDispatch(flightId) {
-    const f = window.flightDB[flightId];
-    currentDispatchState.warnings = [];
-    currentDispatchState.isSaved = false; // 標記為新生成
-
-    // --- STEP A: Runway Analysis ---
-    let icao = f.r.split('-');
-    let dep = icao[0] ? icao[0].trim() : null;
-    let arr = icao[1] ? icao[1].trim() : null;
-    
-    let limitLength = 12000;
-    if(window.airportDB && dep && arr && window.airportDB[dep] && window.airportDB[arr]) {
-        let maxRwyDep = 0;
-        for(let r in window.airportDB[dep].runways) maxRwyDep = Math.max(maxRwyDep, window.airportDB[dep].runways[r].len);
-        let maxRwyArr = 0;
-        for(let r in window.airportDB[arr].runways) maxRwyArr = Math.max(maxRwyArr, window.airportDB[arr].runways[r].len);
-        limitLength = Math.min(maxRwyDep, maxRwyArr);
-    }
-
-    let rwyFactor = 1.0;
-    let maxCargoStruct = 20000;
-    
-    if (limitLength < 8000) {
-        rwyFactor = 0.60;
-        maxCargoStruct = 5000;
-        currentDispatchState.warnings.push("⚠️ RWY LIMITED PAYLOAD");
-    } else if (limitLength < 9000) {
-        rwyFactor = 0.85;
-        maxCargoStruct = 15000;
-    }
-
-    // --- STEP B: Pax Generation ---
-    if (f.type === "FERRY" || f.type === "MAINT") {
-        currentDispatchState.pax = 0;
-    } else if (f.type === "CGO") {
-        currentDispatchState.pax = rnd(100, 350);
-    } else {
-        let basePax = 441;
-        let lf = 0.80;
-        if (f.profile === "BIZ") lf = rnd(65, 90) / 100;
-        if (f.profile === "LEISURE") lf = rnd(85, 98) / 100;
-        currentDispatchState.pax = Math.floor(basePax * lf * rwyFactor);
-    }
-
-    // --- STEP C: Cargo & Fuel ---
-    let paxWt = currentDispatchState.pax * 77;
-    let oew = 129855;
-    let currentZFW = oew + paxWt;
-    let mzfw = 175000;
-    
-    let roomForCargo = mzfw - currentZFW;
-    let targetCargoLimit = Math.min(roomForCargo, maxCargoStruct);
-    
-    let targetCargo = 0;
-    if (f.type === "FERRY" || f.type === "MAINT") {
-        targetCargo = 0;
-    } else if (f.type === "CGO") {
-        targetCargo = targetCargoLimit * (rnd(95, 100)/100);
-    } else {
-        let cargoFactor = 0.5;
-        if (f.profile === "BIZ") cargoFactor = rnd(40, 70)/100;
-        if (f.profile === "LEISURE") cargoFactor = rnd(80, 95)/100;
-        targetCargo = Math.floor(targetCargoLimit * cargoFactor);
-    }
-
-    if (f.type === "FERRY" || f.type === "CGO") {
-        currentDispatchState.ci = rnd(0, 20);
-    } else if (f.dist < 1000 || f.profile === "BIZ") {
-        currentDispatchState.ci = rnd(60, 90);
-    } else {
-        currentDispatchState.ci = rnd(30, 50);
-    }
-
-    // --- STEP D: Trim & Balance ---
-    let fwdRatio = 0.55; 
-    if (f.type === "CGO" || targetCargo > 18000) fwdRatio = 0.50; 
-    if (f.profile === "LEISURE") fwdRatio = 0.40; 
-
-    currentDispatchState.cgoF = Math.floor(targetCargo * fwdRatio);
-    currentDispatchState.cgoA = targetCargo - currentDispatchState.cgoF;
-
-    // --- STEP E: Final Validation ---
-    let tripFuel = (f.dist * 12.5) + (targetCargo/1000 * 0.04 * f.dist);
-    let rsvFuel = 5500; 
-    let estFuel = Math.round(tripFuel + rsvFuel);
-    currentDispatchState.fuel = estFuel;
-
-    let estZFW = currentZFW + targetCargo;
-    let estTOW = estZFW + estFuel;
-    let mtow = 242000;
-
-    if (estTOW > mtow) {
-        let overweight = estTOW - mtow;
-        let reduce = Math.ceil(overweight);
-        let reduceF = Math.ceil(reduce * fwdRatio);
-        let reduceA = reduce - reduceF;
-        currentDispatchState.cgoF = Math.max(0, currentDispatchState.cgoF - reduceF);
-        currentDispatchState.cgoA = Math.max(0, currentDispatchState.cgoA - reduceA);
-        currentDispatchState.warnings.push("⚠️ TOW LIMITED (CARGO REDUCED)");
-    }
-
-    // 存檔
-    saveDispatchToStorage(flightId);
-}
-
-function saveDispatchToStorage(flightId) {
-    let dataToSave = {
-        ci: currentDispatchState.ci,
-        pax: currentDispatchState.pax,
-        cgoF: currentDispatchState.cgoF,
-        cgoA: currentDispatchState.cgoA,
-        fuel: currentDispatchState.fuel,
-        warnings: currentDispatchState.warnings
-    };
-    safeSet(getStorageKey(flightId), JSON.stringify(dataToSave));
-}
-
+// --- Dispatch UI ---
 function updateDispatchDisplay() {
     if(!window.weightDB) return;
 
-    // --- PAX Display ---
+    // PAX
     let pax = currentDispatchState.pax;
     let paxWt = pax * window.weightDB.pax_unit;
     let bagWt = pax * 13; 
@@ -417,7 +169,7 @@ function updateDispatchDisplay() {
     let paxPct = (pax / 441) * 100;
     document.getElementById('bar-pax').style.width = paxPct + "%";
 
-    // --- Cargo Display ---
+    // Cargo
     let cgoF = currentDispatchState.cgoF;
     let cgoA = currentDispatchState.cgoA;
     let totalCgo = cgoF + cgoA;
@@ -434,11 +186,10 @@ function updateDispatchDisplay() {
     document.getElementById('dsp-cgo-fwd-pct').innerText = pctF + "%";
     document.getElementById('dsp-cgo-aft-pct').innerText = pctA + "%";
 
-    // --- CI & Status Display ---
+    // CI & Status
     let ciEl = document.getElementById('dsp-ci-val');
     if(ciEl) ciEl.innerText = currentDispatchState.ci;
 
-    // 顯示 [SAVED] 或 [NEW] 標籤
     let flightDisp = document.getElementById('dsp-flight');
     if(currentDispatchState.flightId) {
         let fInfo = window.flightDB[currentDispatchState.flightId];
@@ -446,7 +197,7 @@ function updateDispatchDisplay() {
         flightDisp.innerHTML = currentDispatchState.flightId + " (" + fInfo.r + ")" + statusTag;
     }
 
-    // --- Fuel & Weight ---
+    // Fuel & Weights
     let fuel = currentDispatchState.fuel;
     document.getElementById('dsp-est-fuel').innerText = fuel;
 
@@ -494,271 +245,21 @@ function confirmDispatch() {
     switchTab('takeoff');
 }
 
-// ... (以下保留 calculateTakeoff, calculateLanding, saveInputs, loadInputs 等函數，保持不變) ...
-// 請務必保留原檔案中的這部分代碼，因無修改故省略
-// ...
-// ============================================
-// 🛫 OPT 起飛優化邏輯
-// ============================================
-function calculateTakeoff() {
-    if(!window.perfDB || !window.weightDB) return;
-
-    let oat = parseFloat(document.getElementById('to-oat').value);
-    if(isNaN(oat)) { alert("⚠️ Please Enter OAT"); return; }
-    
-    let rwyLen = parseFloat(document.getElementById('to-rwy-len').value)||10000;
-    let slope = parseFloat(document.getElementById('to-rwy-slope').value) || 0;
-    let isWet = document.getElementById('to-rwy-cond').value === 'WET';
-    let elev = parseFloat(document.getElementById('to-elev-disp').innerText)||0;
-
-    let oew = window.weightDB.oew;
-    let pax = parseFloat(document.getElementById('pax-weight').value)||0;
-    let cgo = parseFloat(document.getElementById('cargo-total').value)||0;
-    let fuel = parseFloat(document.getElementById('fuel-total').value)||0;
-    let tow = oew + pax + cgo + fuel;
-    
-    function computePerformance(tryFlex, tryConf) {
-        let isToga = (tryFlex === "TOGA");
-        let tempForCalc = isToga ? oat : tryFlex;
-        let fd = window.perfDB.flex_data;
-        let flexDelta = isToga ? 0 : (tempForCalc - fd.base_temp); 
-        
-        if (!isToga && tempForCalc < oat) return { valid: false, reason: "Flex < OAT" };
-
-        let thrustPenaltyFactor = 1.0;
-        if (!isToga && flexDelta > 0) {
-            thrustPenaltyFactor += (flexDelta * fd.flex_dist_penalty);
-        }
-
-        let spd = interpolate(tow, window.perfDB.takeoff_speeds);
-        let corr = window.perfDB.conf_correction[tryConf];
-        let v1 = spd.v1 + corr.v1;
-        let vr = spd.vr + corr.vr;
-        let v2 = spd.v2 + corr.v2;
-
-        if (slope < 0) v1 -= (Math.abs(slope) * window.perfDB.runway_physics.slope_v1_factor);
-        if (isWet) v1 -= 8;
-        if (v1 < 112) v1 = 112; 
-        if (v1 > vr) v1 = vr;
-
-        let dp = window.perfDB.dist_physics;
-        let baseTOD = dp.base_to_dist_ft * Math.pow((tow / 200000), 2); 
-        
-        baseTOD *= thrustPenaltyFactor; 
-        baseTOD *= corr.dist_factor;    
-        
-        if (slope > 0) baseTOD *= (1 + (slope * window.perfDB.runway_physics.slope_dist_factor));
-        if (slope < 0) baseTOD *= (1 + (slope * window.perfDB.runway_physics.slope_dist_factor * 0.5));
-        baseTOD *= (1 + (elev/1000 * 0.05)); 
-
-        if (isWet) baseTOD *= 1.1;
-
-        let margin = rwyLen - baseTOD;
-        
-        return {
-            valid: margin > 0,
-            margin: margin,
-            tod: Math.round(baseTOD),
-            v1: Math.round(v1),
-            vr: Math.round(vr),
-            v2: Math.round(v2),
-            flex: tryFlex,
-            conf: tryConf
-        };
-    }
-
-    let configsToTry = ["1+F", "2", "3"];
-    let bestResult = null;
-    let maxFlex = window.perfDB.flex_data.max_temp;
-
-    loop_outer:
-    for (let conf of configsToTry) {
-        for (let t = maxFlex; t >= oat; t--) {
-            let res = computePerformance(t, conf);
-            if (res.valid) {
-                bestResult = res;
-                break loop_outer;
-            }
-        }
-        let togaRes = computePerformance("TOGA", conf);
-        if (togaRes.valid) {
-            bestResult = togaRes;
-            break loop_outer;
-        }
-    }
-
-    if (!bestResult) {
-        alert("⚠️ PERFORMANCE LIMIT EXCEEDED (Too Heavy or Runway Short)");
-        document.getElementById('res-tow').style.color = "red";
-        document.getElementById('res-tow').innerText = "LIMIT EXCEEDED";
-        return;
-    }
-
-    let n1 = window.perfDB.n1_physics.base_n1;
-    if (bestResult.flex !== "TOGA") {
-        let delta = bestResult.flex - oat;
-        n1 -= (delta * window.perfDB.n1_physics.flex_correction);
-    }
-    n1 -= window.perfDB.bleed_penalty.packs_on;
-
-    let zfwCG = computeInternalZFWCG();
-    let fuelEffect = fuel * window.perfDB.trim_physics.fuel_cg_effect;
-    let towCG = Math.min(42, zfwCG + fuelEffect);
-    let ths = calculateTHS(towCG);
-    let ifTrim = convertToIF(ths.raw);
-
-    document.getElementById('res-tow').innerText = Math.round(tow) + " KG";
-    document.getElementById('res-tow').style.color = (tow > window.weightDB.limits.mtow) ? "#e74c3c" : "#fff";
-    
-    document.getElementById('res-conf').innerText = bestResult.conf;
-    let flexEl = document.getElementById('res-flex');
-    flexEl.innerText = (bestResult.flex === "TOGA") ? "TOGA" : bestResult.flex + "°";
-    flexEl.style.color = (bestResult.flex === "TOGA") ? "#e74c3c" : "#00bfff";
-    
-    document.getElementById('res-n1').innerText = n1.toFixed(1) + "%";
-    document.getElementById('res-trim').innerText = `${ths.text} (${ifTrim}%)`;
-    document.getElementById('res-tow-cg-display').innerText = towCG.toFixed(1) + "%";
-    
-    document.getElementById('res-v1').innerText = bestResult.v1;
-    document.getElementById('res-vr').innerText = bestResult.vr;
-    document.getElementById('res-v2').innerText = bestResult.v2;
-    document.getElementById('res-to-dist').innerText = bestResult.tod + " FT";
-    
-    let gd = Math.round(0.6 * (tow/1000) + 135);
-    document.getElementById('res-green-dot').innerText = gd + " KT";
-
-    let marginEl = document.getElementById('res-stop-margin');
-    if (marginEl) {
-        let marginVal = Math.round(bestResult.margin);
-        marginEl.innerText = (marginVal >= 0 ? "+" : "") + marginVal + " FT";
-        marginEl.style.color = (marginVal < 800) ? "orange" : "#2ecc71";
-    }
-
-    let trip = parseFloat(document.getElementById('trip-fuel').value)||0;
-    document.getElementById('ldg-gw-input').value = Math.round(tow - trip);
-    saveInputs();
+function updatePaxWeight(){
+    if(!window.weightDB) return;
+    let count = parseFloat(document.getElementById("pax-count").value) || 0;
+    let unit = window.weightDB.pax_unit; 
+    let totalWeight = count * unit;
+    document.getElementById("pax-weight").value = totalWeight;
+    let dispEl = document.getElementById("pax-weight-disp");
+    if(dispEl) dispEl.innerText = totalWeight;
 }
 
-// ============================================
-// 🛬 OPT 降落矩陣邏輯
-// ============================================
-function calculateLanding() {
-    if(!window.perfDB || !window.weightDB) return;
-
-    let ldw = parseFloat(document.getElementById('ldg-gw-input').value) || 0;
-    let rwyLen = parseFloat(document.getElementById('ldg-rwy-len').value)||10000;
-    let slope = parseFloat(document.getElementById('ldg-rwy-slope').value) || 0;
-    let isWet = document.getElementById('ldg-rwy-cond').value === 'WET';
-    let revMode = document.getElementById('ldg-rev').value;
-    let hasRev = (revMode === 'max');
-
-    let wdir = parseFloat(document.getElementById('ldg-wind-dir').value)||0;
-    let wspd = parseFloat(document.getElementById('ldg-wind-spd').value)||0;
-    let rhdg = parseFloat(document.getElementById('ldg-rwy-hdg').value)||0;
-    
-    let angleRad = Math.abs(rhdg - wdir) * (Math.PI / 180);
-    let hw = Math.cos(angleRad) * wspd;
-
-    let scenarios = [
-        { conf: 'FULL', ab: 'MAX' },
-        { conf: 'FULL', ab: 'MED' },
-        { conf: 'FULL', ab: 'LO' },
-        { conf: '3',    ab: 'MED' }
-    ];
-
-    let matrixResults = [];
-    let bestOption = null;
-
-    let dp = window.perfDB.dist_physics;
-    let decel = window.perfDB.decel_physics;
-
-    scenarios.forEach(sc => {
-        let vls = interpolateVLS(ldw, window.perfDB.landing_vls_full);
-        if (sc.conf === '3') vls += window.perfDB.landing_conf3_add;
-        let windCorr = Math.max(5, Math.min(15, hw / 3)); 
-        let vapp = Math.round(vls + windCorr);
-
-        let dist = dp.base_ld_dist_ft * (ldw / 180000); 
-
-        dist *= decel.autobrake[sc.ab]; 
-        if (sc.conf === '3') dist *= decel.conf3_penalty; 
-
-        if (slope < 0) dist *= (1 + (Math.abs(slope) * 0.10)); 
-        
-        let revFactor = isWet ? decel.rev_credit.wet : decel.rev_credit.dry;
-        if (hasRev) dist *= (1 - revFactor);
-        
-        let safety = isWet ? decel.safety_margin.wet : decel.safety_margin.dry;
-        let rld = Math.round(dist * safety);
-        let margin = rwyLen - rld;
-
-        let status = (margin >= 0) ? "GO" : "NO";
-        let color = (margin >= 0) ? "#00ff00" : "#e74c3c";
-
-        matrixResults.push({
-            conf: sc.conf,
-            ab: sc.ab,
-            vapp: vapp,
-            dist: rld,
-            status: status,
-            color: color
-        });
-
-        if (status === "GO" && !bestOption) bestOption = matrixResults[matrixResults.length-1];
-        if (status === "GO" && sc.conf === "FULL" && sc.ab === "MED") bestOption = matrixResults[matrixResults.length-1];
-    });
-
-    if (!bestOption) bestOption = matrixResults[0]; 
-
-    let zfwCG = computeInternalZFWCG();
-    let ldgCG = zfwCG - 0.5;
-    let ldgTHS = calculateTHS(ldgCG);
-    let ldgIF = convertToIF(ldgTHS.raw) + 5;
-
-    document.getElementById('res-ldw').innerText = Math.round(ldw) + " KG";
-    document.getElementById('res-ldw').style.color = (ldw > window.weightDB.limits.mlw) ? "#e74c3c" : "#fff";
-
-    let tableHTML = `
-        <table class="matrix-table">
-            <thead>
-                <tr>
-                    <th>CONF</th>
-                    <th>BRK</th>
-                    <th>VAPP</th>
-                    <th>DIST</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-    
-    matrixResults.forEach(r => {
-        tableHTML += `
-            <tr>
-                <td style="color:${r.conf==='3'?'#ffcc00':'#fff'}">${r.conf}</td>
-                <td>${r.ab}</td>
-                <td style="color:#00bfff">${r.vapp}</td>
-                <td>${r.dist}</td>
-                <td style="font-weight:bold; color:${r.color}">${r.status}</td>
-            </tr>
-        `;
-    });
-    tableHTML += `</tbody></table>`;
-
-    let perfSection = document.querySelector('#tab-landing .perf-section');
-    perfSection.innerHTML = `
-        <div class="perf-title" style="color:#ffcc00;">LANDING DISTANCE MATRIX (RLD)</div>
-        ${tableHTML}
-        <div style="border-bottom:1px solid #333;margin:8px 0;"></div>
-        <div class="data-grid" style="grid-template-columns: 1fr 1fr;">
-             <div class="data-item"><div>TRIM (THS)</div><div id="res-ldg-trim">${ldgTHS.text} (${Math.min(100, ldgIF)}%)</div></div>
-             <div class="data-item"><div>LDG CG</div><div id="res-ldg-cg-display">${ldgCG.toFixed(1)}%</div></div>
-        </div>
-    `;
-
-    saveInputs();
+function updateTotalCargo(){
+    document.getElementById("cargo-total").value=(parseFloat(document.getElementById("cargo-fwd").value)||0)+(parseFloat(document.getElementById("cargo-aft").value)||0);
 }
 
+// --- Data Persistence ---
 function saveInputs() {
     const ids = ['pax-count','cargo-fwd','cargo-aft','fuel-total','trip-fuel',
                  'to-rwy-len','to-rwy-cond','to-wind-dir','to-wind-spd','to-rwy-hdg','to-oat',
