@@ -24,9 +24,12 @@
         </div>
         
 <div id="tab-dispatch" class="tab-content">
-    <div class="current-flight-banner" style="border-left-color: #f1c40f;">
-        <div style="font-size:12px;color:#aaa;">DISPATCH RELEASE</div>
-        <div id="dsp-flight" style="color:#fff;font-weight:bold;">NO FLIGHT SELECTED</div>
+    <div class="current-flight-banner" style="border-left-color: #f1c40f; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+            <div style="font-size:12px;color:#aaa;">DISPATCH RELEASE</div>
+            <div id="dsp-flight" style="color:#fff;font-weight:bold;">NO FLIGHT SELECTED</div>
+        </div>
+        <button onclick="forceNewDispatch()" style="background:#333; border:1px solid #666; color:#fff; padding:6px 12px; border-radius:4px; font-size:12px;">🔄 RE-DISPATCH</button>
     </div>
 
     <div class="section-header">FLIGHT PARAMETERS</div>
