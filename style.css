@@ -1,12 +1,13 @@
-/* A330 EFB Dark Theme */
+/* A330 EFB Dark Theme - v4.7 Restored */
 body {
-    background-color: #1a1a1a;
+    background-color: #121212;
     color: #e0e0e0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
-    padding-top: 50px; /* Header height */
-    padding-bottom: 70px; /* Nav height */
+    padding-top: 60px; /* Header height */
+    padding-bottom: 80px; /* Nav height */
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
 }
 
 /* 標題列 */
@@ -16,7 +17,8 @@ body {
     left: 0;
     width: 100%;
     height: 50px;
-    background-color: #2c3e50;
+    background-color: #1e1e1e;
+    border-bottom: 1px solid #333;
     color: white;
     display: flex;
     align-items: center;
@@ -25,16 +27,18 @@ body {
     box-sizing: border-box;
     font-weight: bold;
     z-index: 1000;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    padding-top: env(safe-area-inset-top);
+    height: calc(50px + env(safe-area-inset-top));
 }
 
 .reset-btn {
     background: #c0392b;
     border: none;
     color: white;
-    padding: 4px 8px;
+    padding: 6px 12px;
     border-radius: 4px;
-    font-size: 10px;
+    font-size: 11px;
+    font-weight: bold;
 }
 
 /* 導航列 */
@@ -43,8 +47,8 @@ body {
     bottom: 0;
     left: 0;
     width: 100%;
-    height: 60px;
-    background-color: #222;
+    height: 65px;
+    background-color: #1e1e1e;
     display: flex;
     justify-content: space-around;
     align-items: center;
@@ -62,6 +66,7 @@ body {
     flex-direction: column;
     align-items: center;
     width: 20%;
+    padding: 5px 0;
 }
 
 .nav-btn.active {
@@ -80,39 +85,42 @@ body {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 /* 卡片樣式 */
 .perf-card {
-    background-color: #2a2a2a;
-    border-radius: 10px;
-    padding: 15px;
+    background-color: #252525;
+    border-radius: 12px;
+    padding: 20px;
     margin-bottom: 15px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    border: 1px solid #333;
 }
 
 .perf-title {
     color: #00bfff;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: bold;
     margin-bottom: 15px;
     border-bottom: 1px solid #444;
-    padding-bottom: 5px;
+    padding-bottom: 8px;
     text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 /* 輸入框樣式 */
 .input-group {
-    margin-bottom: 12px;
+    margin-bottom: 15px;
 }
 
 .input-group label {
     display: block;
     font-size: 11px;
-    color: #aaa;
-    margin-bottom: 4px;
+    color: #888;
+    margin-bottom: 6px;
+    font-weight: 500;
 }
 
 input, select {
@@ -120,20 +128,23 @@ input, select {
     background-color: #333;
     border: 1px solid #444;
     color: white;
-    padding: 10px;
-    border-radius: 6px;
-    font-size: 16px; /* 防止 iOS 自動放大 */
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 16px; 
     box-sizing: border-box;
+    appearance: none;
+    -webkit-appearance: none;
 }
 
 input:focus, select:focus {
     border-color: #00bfff;
+    background-color: #3a3a3a;
     outline: none;
 }
 
 .two-col {
     display: flex;
-    gap: 10px;
+    gap: 12px;
 }
 
 .two-col .input-group {
@@ -146,33 +157,38 @@ input:focus, select:focus {
     background-color: #00bfff;
     color: #000;
     border: none;
-    padding: 12px;
-    border-radius: 6px;
-    font-weight: bold;
+    padding: 14px;
+    border-radius: 8px;
+    font-weight: 800;
     font-size: 14px;
     margin-top: 10px;
     cursor: pointer;
+    text-transform: uppercase;
+    transition: background 0.2s;
 }
 
 .action-btn:active {
     background-color: #009acd;
+    transform: scale(0.98);
 }
 
 /* 班表列表樣式 */
 .flight-card {
-    background: #333;
-    border-left: 4px solid #00bfff;
-    padding: 12px;
-    margin-bottom: 10px;
-    border-radius: 4px;
+    background: #252525;
+    border-left: 5px solid #00bfff;
+    padding: 15px;
+    margin-bottom: 12px;
+    border-radius: 6px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
 .flight-card.completed {
     opacity: 0.5;
     border-left-color: #555;
+    filter: grayscale(1);
 }
 
 .flight-info {
@@ -183,22 +199,27 @@ input:focus, select:focus {
     font-size: 12px;
     font-weight: bold;
     color: #00bfff;
+    margin-bottom: 2px;
 }
 
 .flight-route {
-    font-size: 16px;
+    font-size: 18px;
     color: white;
-    margin: 2px 0;
+    font-weight: bold;
 }
 
 .check-btn {
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     border: 2px solid #555;
     background: none;
     color: #555;
     font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
 }
 
 .flight-card.completed .check-btn {
@@ -212,18 +233,19 @@ input:focus, select:focus {
     width: 100%;
     border-collapse: collapse;
     margin-top: 10px;
-    font-size: 12px;
+    font-size: 13px;
+    font-family: monospace;
 }
 
 .matrix-table th {
     text-align: left;
-    color: #888;
-    padding-bottom: 5px;
+    color: #666;
+    padding-bottom: 8px;
     border-bottom: 1px solid #444;
 }
 
 .matrix-table td {
-    padding: 8px 0;
+    padding: 10px 0;
     border-bottom: 1px solid #333;
 }
 
@@ -231,7 +253,7 @@ input:focus, select:focus {
 .result-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    gap: 15px;
 }
 
 .res-item {
@@ -241,11 +263,13 @@ input:focus, select:focus {
 .res-label {
     display: block;
     font-size: 10px;
-    color: #aaa;
+    color: #888;
+    margin-bottom: 4px;
 }
 
 .res-val {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: bold;
     color: #00ff00;
+    font-family: monospace;
 }
