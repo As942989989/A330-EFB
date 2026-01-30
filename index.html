@@ -1,306 +1,199 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>A330-300 EFB</title>
-    <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAMAAAAKE/YAAAAAbFBMVEUAAADjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgDjCgAAAADc0A/lAAAAI3RSTlMAGfCc7vO/gH+wPzC/r39gcGBfX14/MC8vL29vX19fX19fX19J15N5AAAEZUlEQVR42u3c6XbiOhSA4QyBQBodmjaF0vZ+3/+VFs4wQ7FkK7YkK3V9/5WzkCw/WfaSjXF9fX19fX19fX19fX19fX19fX19fX19fX19fX39/9T159v7+8fH+/v72/P19fXydv94//h4f76/f37V9X/W9e324/3j9e3t9fX5/Pj4eP/2/vz4fH97fX1/v/34Vdf/T9f3t/e3t+fH+/vH6+v7x8fb8/vbe13/T93e357fP5/v7+/P7+/Pj4/3t+f6/f/r29v7x/Pj4/3t+fH+/vH89l6v/5e6vb09Pz/eP96fnx/vH2/P9fr/Vbe3t/f3t/fn+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/vz+/v7/6/r/wO4gJ5C1X7n2AAAAABJRU5ErkJggg==">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>A330 EFB v4.7</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <script src="weights.js"></script>
-<script src="airports.js"></script>
-<script src="perf_db.js"></script>
-<script src="routes.js"></script> 
 
-<script src="app.js"></script>
-
-    <div class="nav-header">A330 OPT v28<button class="reset-btn" onclick="clearAllData()">RESET</button></div>
-
-    <div class="content-container">
-        <div id="tab-roster" class="tab-content active">
-            <div id="roster-list"></div>
-            <div style="text-align:center;color:#555;font-size:12px;margin-top:20px;">— END OF ROSTER —</div>
-        </div>
-
-<div id="tab-generator" class="tab-content">
-    <div class="current-flight-banner" style="border-left-color: #9b59b6;">
-        <div style="font-size:12px;color:#aaa;">CAREER STATUS</div>
-        <div id="gen-status-text" style="color:#fff;font-weight:bold;">Loc: LSZH | Hrs: 0.0</div>
-    </div>
-
-    <div class="gen-panel">
-        <div class="section-header" style="margin-top:0;">ACTIONS</div>
-        
-        <select id="base-select" style="width:100%; margin-bottom:10px;">
-            <option value="LSZH">🇨🇭 ZURICH (LSZH)</option>
-            <option value="LSGG">🇨🇭 GENEVA (LSGG)</option>
-        </select>
-        
-        <button class="gen-btn" onclick="startNewCareer()">✨ START NEW CAREER</button>
-        <button id="btn-continue-career" class="gen-btn primary" onclick="continueCareer()" disabled>➡️ CONTINUE NEXT MONTH</button>
-    </div>
-
-    <div class="section-header">SYSTEM LOG</div>
-    <div id="gen-console" class="gen-console">
-        <div>> System ready.</div>
-        <div>> Awaiting command...</div>
-    </div>
+    <div class="nav-header">A330 EFB v4.7</div>
     
-    <div style="height:50px;"></div>
-</div>
-        
-<div id="tab-dispatch" class="tab-content">
-    <div class="current-flight-banner" style="border-left-color: #f1c40f; display:flex; justify-content:space-between; align-items:center;">
-        <div>
-            <div style="font-size:12px;color:#aaa;">DISPATCH RELEASE</div>
-            <div id="dsp-flight" style="color:#fff;font-weight:bold;">NO FLIGHT SELECTED</div>
-        </div>
-        <button onclick="forceNewDispatch()" style="background:#333; border:1px solid #666; color:#fff; padding:6px 12px; border-radius:4px; font-size:12px;">🔄 RE-DISPATCH</button>
+    <div class="nav-bar">
+        <button class="nav-btn" id="btn-gen" onclick="switchTab('gen')">GEN</button>
+        <button class="nav-btn active" id="btn-roster" onclick="switchTab('roster')">ROSTER</button>
+        <button class="nav-btn" id="btn-dispatch" onclick="switchTab('dispatch')">DSP</button>
+        <button class="nav-btn" id="btn-takeoff" onclick="switchTab('takeoff')">PERF TO</button>
+        <button class="nav-btn" id="btn-landing" onclick="switchTab('landing')">PERF LDG</button>
     </div>
 
-    <div class="section-header">FLIGHT PARAMETERS</div>
-    <div class="data-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom:10px;">
-        <div style="border:1px solid #333; padding:10px; border-radius:4px;">
-            <div style="font-size:10px; color:#888;">COST INDEX</div>
-            <div id="dsp-ci-val" style="font-weight:bold; font-size:16px; margin-top:5px; color:#00bfff;">--</div>
-        </div>
-        <div style="border:1px solid #333; padding:10px; border-radius:4px;">
-            <div style="font-size:10px; color:#888;">DISTANCE</div>
-            <div id="dsp-dist-disp" style="font-weight:bold; font-size:16px; margin-top:5px; color:#fff;">-- NM</div>
-        </div>
-        <div style="border:1px solid #333; padding:10px; border-radius:4px;">
-            <div style="font-size:10px; color:#888;">RWY STATUS</div>
-            <div id="dsp-rwy-status" style="font-weight:bold; font-size:11px; margin-top:8px;">CHECKING</div>
-        </div>
-    </div>
-
-    <div class="section-header">PAYLOAD (GENERATED)</div>
-    
-    <div style="margin-top:10px;">
-        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-            <label style="width:auto; color:#00bfff;">PASSENGERS</label>
-            <span style="font-size:12px; font-weight:bold; color:#fff;"><span id="dsp-pax-count">0</span> <span style="color:#666; font-size:10px;">PAX</span></span>
-        </div>
-        <div class="bar-container">
-            <div id="bar-pax" class="bar-fill-pax"></div>
-        </div>
-        <div style="text-align:right; font-size:10px; color:#666; margin-top:2px;">
-            WT: <span id="dsp-pax-total-wt">0</span> KG (INCL BAGS)
-        </div>
-    </div>
-
-    <div style="margin-top:15px;">
-        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-            <label style="width:auto; color:#e67e22;">CARGO (FWD/AFT)</label>
-            <span style="font-size:12px; font-weight:bold; color:#fff;"><span id="dsp-cgo-total">0</span> <span style="color:#666; font-size:10px;">KG</span></span>
-        </div>
-        <div class="bar-container" style="border:1px solid #555;">
-            <div class="bar-split">
-                <div id="bar-cgo-fwd" class="bar-fwd" style="width:50%"></div>
-                <div id="bar-cgo-aft" class="bar-aft" style="width:50%"></div>
+    <div id="tab-gen" class="tab-content">
+        <div class="card">
+            <div class="section-title">CAREER STATUS</div>
+            <div id="gen-status-text" style="font-size:14px; margin-bottom:10px; color:#aaa;">
+                NO DATA
             </div>
-        </div>
-        <div class="ratio-label">
-            <span style="color:#e67e22;">FWD: <span id="dsp-cgo-fwd-val">0</span> (<span id="dsp-cgo-fwd-pct">0%</span>)</span>
-            <span style="color:#2ecc71;">AFT: <span id="dsp-cgo-aft-val">0</span> (<span id="dsp-cgo-aft-pct">0%</span>)</span>
-        </div>
-    </div>
-
-    <div class="section-header">FUEL PLANNING</div>
-    <div style="background:#111; padding:12px; border-radius:6px; border:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
-        <div>
-            <div style="font-size:10px; color:#888;">ESTIMATED BLOCK FUEL</div>
-            <div style="font-size:10px; color:#555; margin-top:2px;">(TRIP + RSV + TAXI)</div>
-        </div>
-        <div style="text-align:right;">
-            <div id="dsp-est-fuel" style="font-size:20px; font-weight:bold; color:#00ff00;">0</div>
-            <div style="font-size:10px; color:#00ff00;">KG</div>
-        </div>
-    </div>
-    
-    <div style="text-align:right; font-size:11px; color:#888; margin-top:5px; margin-bottom:10px;">
-        MAX TOW: <span id="dsp-limit-tow" style="font-weight:bold;">242T</span> | UNDERLOAD: <span id="dsp-underload" style="font-weight:bold;">0</span>
-    </div>
-
-    <div class="result-box">
-         <div class="data-grid" style="grid-template-columns: 1fr 1fr 1fr;">
-            <div class="data-item"><div>ZFW</div><div id="dsp-res-zfw" style="color:#fff;">0</div></div>
-            <div class="data-item"><div>TOW</div><div id="dsp-res-tow">0</div></div>
-            <div class="data-item"><div>LW</div><div id="dsp-res-lw">0</div></div>
-        </div>
-    </div>
-
-    <button id="btn-confirm-dispatch" class="btn-calc" onclick="confirmDispatch()" style="background-color:#2ecc71; margin-top:15px;">CONFIRM & LOAD</button>
-    <div style="height:50px;"></div>
-</div>
-
-        <div id="tab-takeoff" class="tab-content">
-            <div class="current-flight-banner">
-                <div style="font-size:12px;color:#aaa;">FLIGHT INFO</div>
-                <div id="to-flight-title" style="color:#fff;font-weight:bold;">NO FLIGHT</div>
-            </div>
-
-            <div class="rwy-info-row" style="justify-content:space-around; color:#ffcc00; border-color:#554400;">
-                <div>MTOW: 242T</div>
-                <div>MLW: 185T</div>
-                <div>MZFW: 175T</div>
-            </div>
-
-            <div class="section-header">DEPARTURE RUNWAY</div>
-            <div class="input-row">
-                <label style="color:#00bfff;">SELECT RWY</label>
-                <select id="to-rwy-select" onchange="applyRunway('to')"><option value="">MANUAL INPUT</option></select>
-            </div>
-            <div style="text-align:right; margin-top:-8px; margin-bottom:8px; font-size:11px; color:#666;">
-                ELEV: <span id="to-elev-disp" style="color:#00bfff;">0</span> FT
-            </div>
-
-            <div id="to-rwy-info" class="rwy-info-row" style="display:none;"></div>
-
-            <div id="to-manual-data">
-                <div class="input-row"><label>RWY LEN (FT)</label><input type="number" id="to-rwy-len" placeholder="10000" oninput="saveInputs()"></div>
-                <div class="input-row"><label>RWY HDG</label><input type="number" id="to-rwy-hdg" placeholder="HDG" oninput="saveInputs()"></div>
-                <div class="input-row"><label>RWY SLOPE (%)</label><input type="number" id="to-rwy-slope" placeholder="+0.0" step="0.1" oninput="saveInputs()"></div>
-            </div>
-            <div class="input-row"><label>RWY COND</label><select id="to-rwy-cond" onchange="saveInputs()"><option value="DRY">DRY</option><option value="WET">WET</option></select></div>
-            <div class="input-row"><label>WIND (DIR/SPD)</label><div style="display:flex;gap:5px;width:55%;"><input type="number" id="to-wind-dir" placeholder="DIR" oninput="saveInputs()"><input type="number" id="to-wind-spd" placeholder="SPD" oninput="saveInputs()"></div></div>
             
-            <div class="input-row"><label>OAT (°C)</label><input type="number" id="to-oat" placeholder="MANUAL" oninput="saveInputs()"></div>
-
-                        <div class="section-header">LOAD & FUEL (KG)</div>
-            <div class="input-row"><label>PAX (77KG)</label><input type="number" id="pax-count" min="0" oninput="updatePaxWeight(); saveInputs();"></div>
-            <div style="text-align:right; margin-top:-8px; margin-bottom:8px; font-size:11px; color:#666;">
-                TOTAL PAX WT: <span id="pax-weight-disp" style="color:#00bfff;">0</span> KG
-            </div>
-
-            <div class="input-row"><label>CARGO FWD</label><input type="number" id="cargo-fwd" min="0" placeholder="KG" oninput="updateTotalCargo(); saveInputs();"></div>
-            <div class="input-row"><label>CARGO AFT</label><input type="number" id="cargo-aft" min="0" placeholder="KG" oninput="updateTotalCargo(); saveInputs();"></div>
-            <div class="input-row"><label>FUEL TOTAL</label><input type="number" id="fuel-total" min="0" placeholder="KG" oninput="saveInputs()"></div>
-            <div class="input-row"><label style="color:#ff9900;">TRIP FUEL</label><input type="number" id="trip-fuel" min="0" placeholder="KG" style="border-color:#ff9900;" oninput="saveInputs()"></div>
-            
-            <input type="hidden" id="pax-weight"><input type="hidden" id="cargo-total">
-
-            <button class="btn-calc" onclick="calculateTakeoff()">CALCULATE TAKEOFF</button>
-
-            <div class="result-box">
-                <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
-                    <span style="color:#888;font-size:12px;">TAKEOFF WEIGHT</span>
-                    <span id="res-tow" style="font-size:14px;font-weight:bold;color:#fff;">--- KG</span>
-                </div>
-                
-                <div class="perf-section">
-    <div class="perf-title" style="color:#00ff00;">TAKEOFF DATA</div>
-    
-    <div class="data-grid">
-        <div class="data-item"><div>CONFIG</div><div id="res-conf">1+F</div></div>
-        <div class="data-item"><div>FLEX</div><div id="res-flex" style="color:#00bfff;">--</div></div>
-        <div class="data-item"><div>N1</div><div id="res-n1" style="color:#00ff00;">--</div></div>
-    </div>
-    
-    <div style="border-bottom:1px solid #333;margin:8px 0;"></div>
-    
-    <div class="data-grid" style="grid-template-columns: 1fr 1fr;">
-        <div class="data-item"><div>TRIM (THS)</div><div id="res-trim">--</div></div>
-        <div class="data-item"><div>TOW CG</div><div id="res-tow-cg-display">--</div></div>
-    </div>
-
-    <div style="border-bottom:1px solid #333;margin:8px 0;"></div>
-
-    <div class="data-grid">
-        <div class="data-item"><div>V1</div><div id="res-v1" style="color:#e30a17;">--</div></div>
-        <div class="data-item"><div>VR</div><div id="res-vr" style="color:#e30a17;">--</div></div>
-        <div class="data-item"><div>V2</div><div id="res-v2" style="color:#e30a17;">--</div></div>
-    </div>
-    
-    <div style="border-bottom:1px solid #333;margin:8px 0;"></div>
-
-    <div style="display:flex; justify-content:space-between; padding:0 10px;">
-        <span style="font-size:10px;color:#888;">GREEN DOT (CLEAN)</span>
-        <span id="res-green-dot" style="font-size:14px;color:#00ff00;font-weight:bold;">--</span>
-    </div>
-
-    <div style="display:flex; justify-content:space-between; padding:0 10px; margin-top:5px;">
-        <span style="font-size:10px;color:#888;">EST TO DIST</span>
-        <span id="res-to-dist" style="font-size:14px;color:#fff;font-weight:bold;">-- FT</span>
-    </div>
-    <div style="display:flex; justify-content:space-between; padding:0 10px; margin-top:5px;">
-        <span style="font-size:10px;color:#888;">STOP MARGIN</span>
-        <span id="res-stop-margin" style="font-size:14px;color:#fff;font-weight:bold;">-- FT</span>
-    </div>
-</div>
-            </div>
-            <div style="height:50px;"></div>
-        </div>
-
-        <div id="tab-landing" class="tab-content">
-            <div class="current-flight-banner">
-                <div style="font-size:12px;color:#aaa;">DESTINATION</div>
-                <div id="ldg-flight-desc" style="color:#fff;font-weight:bold;font-size:12px;">NO FLIGHT</div>
-            </div>
-
-            <div class="section-header">ARRIVAL RUNWAY</div>
-            <div class="input-row">
-                <label style="color:#00bfff;">SELECT RWY</label>
-                <select id="ldg-rwy-select" onchange="applyRunway('ldg')"><option value="">MANUAL INPUT</option></select>
-            </div>
-            <div style="text-align:right; margin-top:-8px; margin-bottom:8px; font-size:11px; color:#666;">
-                ELEV: <span id="ldg-elev-disp" style="color:#00bfff;">0</span> FT
-            </div>
-
-            <div id="ldg-rwy-info" class="rwy-info-row" style="display:none;"></div>
-
-            <div id="ldg-manual-data">
-                <div class="input-row"><label>RWY LEN (FT)</label><input type="number" id="ldg-rwy-len" placeholder="10000" oninput="saveInputs()"></div>
-                <div class="input-row"><label>RWY HDG</label><input type="number" id="ldg-rwy-hdg" placeholder="HDG" oninput="saveInputs()"></div>
-                <div class="input-row"><label>RWY SLOPE (%)</label><input type="number" id="ldg-rwy-slope" placeholder="+0.0" step="0.1" oninput="saveInputs()"></div>
-            </div>
-            <div class="input-row"><label>RWY COND</label><select id="ldg-rwy-cond" onchange="saveInputs()"><option value="DRY">DRY</option><option value="WET">WET</option></select></div>
-            <div class="input-row"><label>WIND (DIR/SPD)</label><div style="display:flex;gap:5px;width:55%;"><input type="number" id="ldg-wind-dir" placeholder="DIR" oninput="saveInputs()"><input type="number" id="ldg-wind-spd" placeholder="SPD" oninput="saveInputs()"></div></div>
-            
-            <div class="input-row">
-                <label>REVERSER</label>
-                <select id="ldg-rev" onchange="saveInputs()">
-                    <option value="idle">IDLE REV</option>
-                    <option value="max">MAX REV</option>
+            <div class="input-group">
+                <label>HOME BASE</label>
+                <select id="base-select">
+                    <option value="LSZH">LSZH (Zurich)</option>
+                    <option value="LSGG">LSGG (Geneva)</option>
                 </select>
             </div>
 
-            <div class="section-header">WEIGHT (KG)</div>
-            <div class="input-row"><label>CURRENT G.W</label><input type="number" id="ldg-gw-input" placeholder="e.g. 180500" oninput="saveInputs()"></div>
-
-            <button class="btn-calc" onclick="calculateLanding()">CALCULATE LANDING</button>
-
-            <div class="result-box">
-                <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
-                    <span style="color:#888;font-size:12px;">EST. LANDING WEIGHT</span>
-                    <span id="res-ldw" style="font-size:14px;font-weight:bold;color:#fff;">--- KG</span>
-                </div>
-                
-                <div class="perf-section">
-                    <div class="perf-title" style="color:#666;">PERFORMANCE MATRIX</div>
-                    <div style="text-align:center; padding:20px; color:#444; font-size:12px; font-style:italic;">
-                        Press CALCULATE to generate<br>Landing Distance Matrix (RLD)
-                    </div>
-                </div>
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button class="action-btn" onclick="startNewCareer()">✨ START NEW CAREER</button>
+                <button class="action-btn" id="btn-continue-career" onclick="continueCareer()" disabled>⏩ NEXT MONTH</button>
             </div>
-            <div style="height:50px;"></div>
+            
+            <div class="console-box" id="gen-console">
+                <div>> SYSTEM READY</div>
+            </div>
         </div>
     </div>
 
-    <div class="bottom-nav" style="grid-template-columns: repeat(5, 1fr);">
-    <button class="nav-btn active" onclick="switchTab('roster')" id="btn-roster"><span class="nav-icon">📅</span><span>ROSTER</span></button>
-    <button class="nav-btn" onclick="switchTab('generator')" id="btn-generator"><span class="nav-icon">⚙️</span><span>GEN</span></button>
+    <div id="tab-roster" class="tab-content active">
+        <div id="roster-list">
+            <div style="text-align:center; padding:20px; color:#666;">
+                NO FLIGHTS LOADED<br>
+                PLEASE GO TO [GEN] TAB
+            </div>
+        </div>
+    </div>
     
-    <button class="nav-btn" onclick="switchTab('dispatch')" id="btn-dispatch"><span class="nav-icon">📝</span><span>DSP</span></button>
-    <button class="nav-btn" onclick="switchTab('takeoff')" id="btn-takeoff"><span class="nav-icon">🛫</span><span>PERF</span></button>
-    <button class="nav-btn" onclick="switchTab('landing')" id="btn-landing"><span class="nav-icon">🛬</span><span>ARR</span></button>
-</div>
+    <div id="tab-dispatch" class="tab-content">
+        <div class="card">
+            <div class="section-title">FLIGHT DISPATCH</div>
+            <div id="dsp-flight" style="font-size:18px; color:#00bfff; font-weight:bold; margin-bottom:15px;">
+                NO FLIGHT SELECTED
+            </div>
 
-    
-            <script src="weights.js"></script>
+            <div id="dsp-warnings" style="margin-bottom:10px; min-height:5px;"></div>
+
+            <button class="action-btn" onclick="forceNewDispatch()">GENERATE / RE-CALCULATE</button>
+
+            <div class="separator"></div>
+
+            <div class="input-group">
+                <label for="pax-count">PASSENGERS</label>
+                <input type="number" id="pax-count" onchange="saveInputs()">
+            </div>
+            
+            <div class="input-group">
+                <label>CARGO FWD (KG)</label>
+                <input type="number" id="cargo-fwd" onchange="saveInputs()">
+            </div>
+
+            <div class="input-group">
+                <label>CARGO AFT (KG)</label>
+                <input type="number" id="cargo-aft" onchange="saveInputs()">
+            </div>
+            
+            <div class="input-group">
+                <label>BLOCK FUEL (KG)</label>
+                <input type="number" id="fuel-total" onchange="saveInputs()">
+            </div>
+
+            <div class="input-group">
+                <label>TRIP FUEL (KG)</label>
+                <input type="number" id="trip-fuel" disabled style="background:#222; color:#aaa;">
+            </div>
+
+            <div class="result-box" style="margin-top:15px;">
+                <div>MAC ZFW: <span id="res-mac-zfw" style="float:right">--</span></div>
+                <div>TOW: <span id="res-tow" style="float:right">--</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-takeoff" class="tab-content">
+        <div class="card">
+            <div class="section-title">TAKEOFF PERFORMANCE</div>
+            <div id="to-flight-title" style="color:#00bfff; margin-bottom:10px;">--</div>
+
+            <div class="row">
+                <div class="input-group half">
+                    <label>RWY LEN (M)</label>
+                    <input type="number" id="to-rwy-len" value="3500">
+                </div>
+                <div class="input-group half">
+                    <label>ELEV (FT)</label>
+                    <div id="to-elev-disp" style="padding:10px; background:#222; border-radius:4px; text-align:right;">0</div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="input-group half">
+                    <label>OAT (°C)</label>
+                    <input type="number" id="to-oat" value="15">
+                </div>
+                <div class="input-group half">
+                    <label>COND</label>
+                    <select id="to-rwy-cond">
+                        <option value="DRY">DRY</option>
+                        <option value="WET">WET</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>SLOPE (%)</label>
+                <input type="number" id="to-rwy-slope" value="0.0" step="0.1">
+            </div>
+
+            <button class="action-btn" onclick="calculateTakeoff()">CALCULATE</button>
+
+            <div class="perf-section">
+                <div class="perf-row">
+                    <span>V1</span><span class="perf-val" id="res-v1">--</span>
+                </div>
+                <div class="perf-row">
+                    <span>VR</span><span class="perf-val" id="res-vr">--</span>
+                </div>
+                <div class="perf-row">
+                    <span>V2</span><span class="perf-val" id="res-v2">--</span>
+                </div>
+                <div class="separator"></div>
+                <div class="perf-row">
+                    <span>TRIM</span><span class="perf-val" id="res-trim">--</span>
+                </div>
+                <div class="perf-row">
+                    <span>FLEX</span><span class="perf-val" id="res-flex">--</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-landing" class="tab-content">
+        <div class="card">
+            <div class="section-title">LANDING PERFORMANCE</div>
+            <div id="ldg-flight-desc" style="color:#888; font-size:12px; margin-bottom:10px;">--</div>
+
+            <div class="row">
+                <div class="input-group half">
+                    <label>RWY AVAIL (M)</label>
+                    <input type="number" id="ldg-rwy-len" value="3000">
+                </div>
+                <div class="input-group half">
+                    <label>REVERSER</label>
+                    <select id="ldg-rev">
+                        <option value="YES">YES</option>
+                        <option value="NO">NO</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>CONDITION</label>
+                <select id="ldg-rwy-cond">
+                    <option value="DRY">DRY</option>
+                    <option value="WET">WET</option>
+                </select>
+            </div>
+
+            <button class="action-btn" onclick="calculateLanding()">CALCULATE</button>
+
+            <div class="result-box" style="margin-top:15px; text-align:center;">
+                EST. LDW: <span id="res-ldw" style="color:#00bfff; font-weight:bold;">--</span>
+            </div>
+
+            <div class="perf-section"></div>
+        </div>
+    </div>
+
+    <script src="weights.js"></script>
     <script src="airports.js"></script>
     <script src="perf_db.js"></script>
     <script src="routes.js"></script> 
@@ -309,4 +202,3 @@
 
 </body>
 </html>
-
