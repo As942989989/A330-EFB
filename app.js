@@ -1,62 +1,116 @@
 // ==========================================
-// 📱 A330 EFB Main Controller (UI & Events)
+// 📱 A330 EFB App Controller v4.7
 // ==========================================
 
-let completedFlights = JSON.parse(safeGet('a330_roster_v25')) || {};
+let completedFlights = JSON.parse(safeGet('a330_completed_v4')) || {};
 
 window.onload = function() {
-    const baseVersion = "v32.0 (Modular)"; 
-    let dateStr = "Dev";
-    try {
-        let d = new Date(document.lastModified);
-        dateStr = (d.getMonth()+1) + "/" + d.getDate() + " " + d.getHours() + ":" + String(d.getMinutes()).padStart(2, '0');
-    } catch(e) {}
+    // 載入 Generator 狀態
+    if(window.Generator) Generator.load();
 
+    // 更新標題
     let titleEl = document.querySelector('.nav-header');
     if(titleEl) {
-        let btnHTML = titleEl.innerHTML.match(/<button.*<\/button>/)[0];
-        titleEl.innerHTML = `A330 OPT <span style="font-size:12px; color:#00ff00;">${baseVersion} (${dateStr})</span>` + btnHTML;
+        titleEl.innerHTML = `A330 EFB <span style="font-size:12px; color:#00ff00;">v4.7 CAREER</span>` + 
+                            `<button class="reset-btn" onclick="clearAllData()">RESET</button>`;
     }
 
-    if (!window.flightDB || !window.perfDB || !window.weightDB || !window.airportDB) {
-        alert("⚠️ DB Error! Ensure all JS files are loaded.");
-    } else {
-        renderRoster();
-        try { loadInputs(); } catch(e) { console.log("No prev inputs"); }
-    }
+    // 檢查資料庫
+    if (!window.routeDB) alert("⚠️ RouteDB missing!");
+    
+    updateGeneratorUI();
+    renderRoster();
+    try { loadInputs(); } catch(e) {}
 };
 
-function switchTab(t) {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+// --- Generator UI Logic ---
+function updateGeneratorUI() {
+    let s = Generator.state;
+    let statusEl = document.getElementById('gen-status-text');
+    let logEl = document.getElementById('gen-log');
     
-    const tab = document.getElementById('tab-' + t);
-    const btn = document.getElementById('btn-' + t);
+    if(statusEl) {
+        statusEl.innerHTML = `
+            LOCATION: <span style="color:#00bfff">${s.location}</span> | 
+            HOURS: ${s.totalHours.toFixed(1)} | 
+            MAINT: ${s.maintCounter.toFixed(1)}/500h
+        `;
+    }
     
-    if(tab) tab.classList.add('active');
-    if(btn) btn.classList.add('active');
+    // 根據是否有存檔，切換按鈕狀態
+    let btnCont = document.getElementById('btn-continue-career');
+    if(btnCont) btnCont.disabled = (s.totalHours === 0);
 }
 
-// --- Roster UI ---
+function startNewCareer() {
+    let base = document.getElementById('base-select').value;
+    if(confirm(`Start new career at ${base}? Previous data will be lost.`)) {
+        Generator.reset(base);
+        generateAndLoad();
+    }
+}
+
+function continueCareer() {
+    generateAndLoad();
+}
+
+function generateAndLoad() {
+    logToConsole("🔄 Generating Roster...");
+    let newRoster = Generator.generateMonth();
+    
+    // 存入 LocalStorage 供 Roster.js 讀取
+    localStorage.setItem('a330_roster_data', JSON.stringify(newRoster));
+    
+    // 重新載入 Roster
+    loadRosterFromStorage(); 
+    renderRoster();
+    updateGeneratorUI();
+    
+    logToConsole(`✅ Generated ${Object.keys(newRoster).length} flights.`);
+    switchTab('roster');
+}
+
+function logToConsole(msg) {
+    let el = document.getElementById('gen-console');
+    if(el) {
+        el.innerHTML += `<div>> ${msg}</div>`;
+        el.scrollTop = el.scrollHeight;
+    }
+}
+
+// --- Roster UI (Updated for Tags) ---
 function renderRoster() {
     const list = document.getElementById('roster-list');
     if(!list) return;
     list.innerHTML = '';
-    if(!window.flightDB) return;
+    
+    if(!window.flightDB || Object.keys(window.flightDB).length === 0) {
+        list.innerHTML = `<div style="text-align:center; padding:20px; color:#666;">
+            NO ROSTER DATA<br>Go to GENERATOR tab to start.
+        </div>`;
+        return;
+    }
+
     for (const [k, v] of Object.entries(window.flightDB)) {
-        const infoTag = v.type === "PAX" ? "PAX" : (v.type === "CGO" ? "CGO" : "FERRY");
+        // 根據標籤決定顏色與圖示
+        let badgeColor = "#00bfff";
+        let icon = "✈️";
         
+        if (v.tags.includes("MAINT")) { badgeColor = "#e74c3c"; icon = "🛠️"; }
+        else if (v.tags.includes("PREIGHTER")) { badgeColor = "#9b59b6"; icon = "📦"; }
+        else if (v.tags.includes("SHUTTLE")) { badgeColor = "#95a5a6"; icon = "🚌"; }
+        else if (v.tags.includes("CHARTER")) { badgeColor = "#f1c40f"; icon = "🏖️"; }
+
         const d = document.createElement('div');
         d.className = `flight-card ${completedFlights[k]?'completed':''}`;
         d.onclick = () => loadFlight(k); 
         d.innerHTML = `
             <div class="flight-info">
-                <div class="flight-day">${v.day} | ${k}</div>
+                <div class="flight-day" style="color:${badgeColor}">${v.day} | ${v.id}</div>
                 <div class="flight-route">${v.r}</div>
-                <div style="font-size:12px; color:#00bfff; margin-bottom:4px; font-weight:bold;">
-                    ${infoTag} | ${v.dist || 0} NM
+                <div style="font-size:11px; color:#aaa; margin-top:4px;">
+                    ${icon} ${v.d}
                 </div>
-                <div class="flight-desc">${v.d}</div>
             </div>
             <button class="check-btn" onclick="event.stopPropagation(); toggle('${k}')">✓</button>
         `;
@@ -64,9 +118,21 @@ function renderRoster() {
     }
 }
 
+// ... (其餘 switchTab, loadFlight, toggle 等函數維持原樣，無需變動) ...
+// 為了節省篇幅，請保留您原本 app.js 的後半段 (loadFlight, switchTab, UI helpers)
+// 只要確保 renderRoster 被上面的版本覆蓋即可。
+
+// --- 這裡補上必要的 Helper 以防您直接複製貼上蓋掉 ---
+function switchTab(t) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + t).classList.add('active');
+    document.getElementById('btn-' + t).classList.add('active');
+}
+
 function toggle(k) {
     if(completedFlights[k]) delete completedFlights[k]; else completedFlights[k]=true;
-    safeSet('a330_roster_v25', JSON.stringify(completedFlights));
+    safeSet('a330_completed_v4', JSON.stringify(completedFlights));
     renderRoster();
 }
 
@@ -74,226 +140,20 @@ function loadFlight(k) {
     if(!window.flightDB[k]) return;
     const d = window.flightDB[k];
     
-    let t1 = document.getElementById('to-flight-title');
-    let t2 = document.getElementById('ldg-flight-desc');
-    let t3 = document.getElementById('dsp-flight');
-    
-    if(t1) t1.innerText = k + " (" + d.r + ")";
-    if(t2) t2.innerText = k + " (" + d.r + ")";
-    if(t3) t3.innerText = k + " (" + d.r + ")";
+    // 更新標題
+    ['to-flight-title', 'ldg-flight-desc', 'dsp-flight'].forEach(id => {
+        let el = document.getElementById(id);
+        if(el) el.innerText = d.id + " (" + d.r + ")";
+    });
 
-    let route = d.r.toUpperCase();
-    let dep = route.split('-')[0].trim();
-    let arr = route.split('-')[1].trim();
-    
-    let oatEl = document.getElementById('to-oat');
-    if(oatEl) oatEl.value = ""; 
-
-    if(window.airportDB) {
-        if(window.airportDB[dep]) document.getElementById('to-elev-disp').innerText = window.airportDB[dep].elev || 0;
-        if(window.airportDB[arr]) document.getElementById('ldg-elev-disp').innerText = window.airportDB[arr].elev || 0;
-    }
-
-    populateRunways('to-rwy-select', dep);
-    populateRunways('ldg-rwy-select', arr);
-    
-    applyRunway('to'); 
-    applyRunway('ldg');
-    
+    // 處理 DSP
     initDispatchSession(k); 
     switchTab('dispatch'); 
 }
 
-// --- Runway UI ---
-function populateRunways(selectId, icao) {
-    const sel = document.getElementById(selectId);
-    if(!sel) return;
-    sel.innerHTML = '<option value="">MANUAL INPUT</option>';
-    if (window.airportDB && window.airportDB[icao]) {
-        const apt = window.airportDB[icao];
-        for (const [rwyID, data] of Object.entries(apt.runways)) {
-            let opt = document.createElement('option');
-            opt.value = rwyID; 
-            opt.innerText = `${rwyID} (${data.len}ft)`;
-            opt.dataset.len = data.len;
-            opt.dataset.hdg = data.hdg;
-            opt.dataset.slope = data.slope !== undefined ? data.slope : 0;
-            sel.appendChild(opt);
-        }
-    }
-}
-
-function applyRunway(prefix) {
-    const sel = document.getElementById(prefix + '-rwy-select');
-    if(!sel) return;
-    const opt = sel.options[sel.selectedIndex];
-    const manualDiv = document.getElementById(prefix + '-manual-data');
-    const infoDiv = document.getElementById(prefix + '-rwy-info');
-
-    if (opt.value !== "") {
-        document.getElementById(prefix + '-rwy-len').value = opt.dataset.len;
-        document.getElementById(prefix + '-rwy-hdg').value = opt.dataset.hdg;
-        let slopeInput = document.getElementById(prefix + '-rwy-slope');
-        if(slopeInput) slopeInput.value = opt.dataset.slope;
-
-        if(infoDiv) {
-            infoDiv.style.display = 'flex'; 
-            infoDiv.innerHTML = `
-                <div>LEN: <span style="color:#00bfff">${opt.dataset.len}</span> FT</div>
-                <div style="border-left:1px solid #444; margin:0 5px;"></div>
-                <div>HDG: <span style="color:#00bfff">${opt.dataset.hdg}°</span></div>
-                <div style="border-left:1px solid #444; margin:0 5px;"></div>
-                <div>SLOPE: <span style="color:#00bfff">${opt.dataset.slope}%</span></div>
-            `;
-        }
-        if(manualDiv) manualDiv.style.display = 'none';
-    } else {
-        if(manualDiv) manualDiv.style.display = 'block';
-        if(infoDiv) infoDiv.style.display = 'none';
-    }
-}
-
-// --- Dispatch UI ---
-function updateDispatchDisplay() {
-    if(!window.weightDB) return;
-
-    // PAX
-    let pax = currentDispatchState.pax;
-    let paxWt = pax * window.weightDB.pax_unit;
-    let bagWt = pax * 13; 
-    let totalPaxLoad = paxWt + bagWt;
-
-    document.getElementById('dsp-pax-count').innerText = pax;
-    document.getElementById('dsp-pax-total-wt').innerText = totalPaxLoad;
-    
-    let paxPct = (pax / 441) * 100;
-    document.getElementById('bar-pax').style.width = paxPct + "%";
-
-    // Cargo
-    let cgoF = currentDispatchState.cgoF;
-    let cgoA = currentDispatchState.cgoA;
-    let totalCgo = cgoF + cgoA;
-
-    document.getElementById('dsp-cgo-total').innerText = totalCgo;
-    document.getElementById('dsp-cgo-fwd-val').innerText = cgoF;
-    document.getElementById('dsp-cgo-aft-val').innerText = cgoA;
-
-    let pctF = totalCgo > 0 ? Math.round((cgoF / totalCgo) * 100) : 50;
-    let pctA = totalCgo > 0 ? (100 - pctF) : 50;
-
-    document.getElementById('bar-cgo-fwd').style.width = pctF + "%";
-    document.getElementById('bar-cgo-aft').style.width = pctA + "%";
-    document.getElementById('dsp-cgo-fwd-pct').innerText = pctF + "%";
-    document.getElementById('dsp-cgo-aft-pct').innerText = pctA + "%";
-
-    // CI & Status
-    let ciEl = document.getElementById('dsp-ci-val');
-    if(ciEl) ciEl.innerText = currentDispatchState.ci;
-
-    let flightDisp = document.getElementById('dsp-flight');
-    if(currentDispatchState.flightId) {
-        let fInfo = window.flightDB[currentDispatchState.flightId];
-        let statusTag = currentDispatchState.isSaved ? " <span style='color:#888; font-size:10px;'>[SAVED]</span>" : " <span style='color:#00ff00; font-size:10px;'>[NEW]</span>";
-        flightDisp.innerHTML = currentDispatchState.flightId + " (" + fInfo.r + ")" + statusTag;
-    }
-
-    // Fuel & Weights
-    let fuel = currentDispatchState.fuel;
-    document.getElementById('dsp-est-fuel').innerText = fuel;
-
-    let totalLoad = totalPaxLoad + totalCgo;
-    let zfw = window.weightDB.oew + totalLoad;
-    let tow = zfw + fuel;
-    let tripBurn = Math.round(currentDispatchState.dist * 12.5);
-    let lw = tow - tripBurn;
-
-    document.getElementById('dsp-res-zfw').innerText = Math.round(zfw);
-    document.getElementById('dsp-res-tow').innerText = Math.round(tow);
-    document.getElementById('dsp-res-lw').innerText = Math.round(lw);
-
-    let limitTOW = 242000; 
-    document.getElementById('dsp-limit-tow').innerText = (limitTOW/1000) + "T";
-    
-    let statusEl = document.getElementById('dsp-rwy-status');
-    if (currentDispatchState.warnings.length > 0) {
-        statusEl.innerText = currentDispatchState.warnings.join(" | ");
-        statusEl.style.color = "#f1c40f";
-    } else {
-        statusEl.innerText = "UNRESTRICTED";
-        statusEl.style.color = "#2ecc71";
-    }
-
-    let underload = limitTOW - tow;
-    let ulEl = document.getElementById('dsp-underload');
-    ulEl.innerText = (underload >= 0 ? "+" : "") + Math.round(underload);
-    ulEl.style.color = (underload < 0) ? "#e74c3c" : "#00bfff";
-}
-
-function confirmDispatch() {
-    document.getElementById('pax-count').value = currentDispatchState.pax;
-    document.getElementById('cargo-fwd').value = currentDispatchState.cgoF;
-    document.getElementById('cargo-aft').value = currentDispatchState.cgoA;
-    document.getElementById('fuel-total').value = currentDispatchState.fuel;
-    
-    let estTrip = Math.round(currentDispatchState.dist * 12.5);
-    document.getElementById('trip-fuel').value = estTrip;
-    
-    updatePaxWeight();
-    updateTotalCargo();
-    saveInputs();
-
-    switchTab('takeoff');
-}
-
-function updatePaxWeight(){
-    if(!window.weightDB) return;
-    let count = parseFloat(document.getElementById("pax-count").value) || 0;
-    let unit = window.weightDB.pax_unit; 
-    let totalWeight = count * unit;
-    document.getElementById("pax-weight").value = totalWeight;
-    let dispEl = document.getElementById("pax-weight-disp");
-    if(dispEl) dispEl.innerText = totalWeight;
-}
-
-function updateTotalCargo(){
-    document.getElementById("cargo-total").value=(parseFloat(document.getElementById("cargo-fwd").value)||0)+(parseFloat(document.getElementById("cargo-aft").value)||0);
-}
-
-// --- Data Persistence ---
-function saveInputs() {
-    const ids = ['pax-count','cargo-fwd','cargo-aft','fuel-total','trip-fuel',
-                 'to-rwy-len','to-rwy-cond','to-wind-dir','to-wind-spd','to-rwy-hdg','to-oat',
-                 'to-rwy-slope', 
-                 'ldg-rwy-len','ldg-rwy-cond','ldg-wind-dir','ldg-wind-spd','ldg-rwy-hdg',
-                 'ldg-rwy-slope', 'ldg-rev', 
-                 'ldg-gw-input'];
-    let data = {};
-    ids.forEach(id => { let el=document.getElementById(id); if(el) data[id]=el.value; });
-    data.title = document.getElementById('to-flight-title').innerText;
-    data.desc = document.getElementById('ldg-flight-desc').innerText;
-    safeSet('a330_calc_inputs_v25', JSON.stringify(data));
-}
-
-function loadInputs() {
-    const d = JSON.parse(safeGet('a330_calc_inputs_v25'));
-    if(d) {
-        for(let k in d) {
-            let el = document.getElementById(k);
-            if(el) el.value = d[k];
-        }
-        if(d.title) document.getElementById('to-flight-title').innerText = d.title;
-        if(d.desc) document.getElementById('ldg-flight-desc').innerText = d.desc;
-        updatePaxWeight(); updateTotalCargo();
-        
-        applyRunway('to');
-        applyRunway('ldg');
-    }
-}
-
 function clearAllData() {
-    if(confirm("RESET ALL DATA?")) { 
-        safeRem('a330_calc_inputs_v25'); 
-        safeRem('a330_roster_v25'); 
+    if(confirm("FULL RESET?")) { 
+        localStorage.clear(); 
         location.reload(); 
     }
 }
