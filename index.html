@@ -10,10 +10,15 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <script src="roster.js"></script>
-    <script src="perf_db.js"></script>
-    <script src="weights.js"></script>
     <script src="airports.js"></script>
+    <script src="routes.js"></script> <script src="perf_db.js"></script>
+    <script src="weights.js"></script>
+
+    <script src="utils.js"></script>
+    <script src="generator.js"></script> <script src="roster.js"></script>    <script src="dispatch.js"></script>
+
+    <script src="app.js"></script>
+
 
     <div class="nav-header">A330 OPT v28<button class="reset-btn" onclick="clearAllData()">RESET</button></div>
 
@@ -22,6 +27,33 @@
             <div id="roster-list"></div>
             <div style="text-align:center;color:#555;font-size:12px;margin-top:20px;">— END OF ROSTER —</div>
         </div>
+
+<div id="tab-generator" class="tab-content">
+    <div class="current-flight-banner" style="border-left-color: #9b59b6;">
+        <div style="font-size:12px;color:#aaa;">CAREER STATUS</div>
+        <div id="gen-status-text" style="color:#fff;font-weight:bold;">Loc: LSZH | Hrs: 0.0</div>
+    </div>
+
+    <div class="gen-panel">
+        <div class="section-header" style="margin-top:0;">ACTIONS</div>
+        
+        <select id="base-select" style="width:100%; margin-bottom:10px;">
+            <option value="LSZH">🇨🇭 ZURICH (LSZH)</option>
+            <option value="LSGG">🇨🇭 GENEVA (LSGG)</option>
+        </select>
+        
+        <button class="gen-btn" onclick="startNewCareer()">✨ START NEW CAREER</button>
+        <button id="btn-continue-career" class="gen-btn primary" onclick="continueCareer()" disabled>➡️ CONTINUE NEXT MONTH</button>
+    </div>
+
+    <div class="section-header">SYSTEM LOG</div>
+    <div id="gen-console" class="gen-console">
+        <div>> System ready.</div>
+        <div>> Awaiting command...</div>
+    </div>
+    
+    <div style="height:50px;"></div>
+</div>
         
 <div id="tab-dispatch" class="tab-content">
     <div class="current-flight-banner" style="border-left-color: #f1c40f; display:flex; justify-content:space-between; align-items:center;">
@@ -261,12 +293,15 @@
         </div>
     </div>
 
-    <div class="bottom-nav" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
+    <div class="bottom-nav" style="grid-template-columns: repeat(5, 1fr);">
     <button class="nav-btn active" onclick="switchTab('roster')" id="btn-roster"><span class="nav-icon">📅</span><span>ROSTER</span></button>
+    <button class="nav-btn" onclick="switchTab('generator')" id="btn-generator"><span class="nav-icon">⚙️</span><span>GEN</span></button>
+    
     <button class="nav-btn" onclick="switchTab('dispatch')" id="btn-dispatch"><span class="nav-icon">📝</span><span>DSP</span></button>
     <button class="nav-btn" onclick="switchTab('takeoff')" id="btn-takeoff"><span class="nav-icon">🛫</span><span>PERF</span></button>
     <button class="nav-btn" onclick="switchTab('landing')" id="btn-landing"><span class="nav-icon">🛬</span><span>ARR</span></button>
 </div>
+
     
         <script src="utils.js"></script>        <script src="dispatch.js"></script>     <script src="performance.js"></script>  <script src="app.js"></script>          </body>
 </html>
