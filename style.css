@@ -430,3 +430,47 @@ input[type=range]::-webkit-slider-runnable-track {
     margin-top: 2px;
     font-family: monospace;
 }
+
+/* --- Generator Console Styles --- */
+.gen-panel {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.gen-console {
+    background: #000;
+    color: #00ff00;
+    font-family: monospace;
+    font-size: 11px;
+    height: 150px;
+    overflow-y: auto;
+    padding: 10px;
+    border: 1px solid #333;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+.gen-btn {
+    width: 100%;
+    padding: 12px;
+    margin-top: 10px;
+    background: #333;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+.gen-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.gen-btn.primary {
+    background: #e30a17; /* Swiss Red */
+    border: none;
+}
+
