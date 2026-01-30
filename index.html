@@ -8,21 +8,16 @@
 </head>
 <body>
 
-    <div class="nav-header">A330 EFB v4.7</div>
-    
-    <div class="nav-bar">
-        <button class="nav-btn" id="btn-gen" onclick="switchTab('gen')">GEN</button>
-        <button class="nav-btn active" id="btn-roster" onclick="switchTab('roster')">ROSTER</button>
-        <button class="nav-btn" id="btn-dispatch" onclick="switchTab('dispatch')">DSP</button>
-        <button class="nav-btn" id="btn-takeoff" onclick="switchTab('takeoff')">PERF TO</button>
-        <button class="nav-btn" id="btn-landing" onclick="switchTab('landing')">PERF LDG</button>
+    <div class="nav-header">
+        A330 EFB <span style="font-size:12px; color:#00ff00;">v4.7</span>
+        <button class="reset-btn" onclick="clearAllData()">RESET</button>
     </div>
 
-    <div id="tab-gen" class="tab-content">
-        <div class="card">
-            <div class="section-title">CAREER STATUS</div>
-            <div id="gen-status-text" style="font-size:14px; margin-bottom:10px; color:#aaa;">
-                NO DATA
+    <div id="tab-generator" class="tab-content">
+        <div class="perf-card">
+            <div class="perf-title">CAREER STATUS</div>
+            <div id="gen-status-text" style="font-size:14px; margin-bottom:10px; color:#ddd;">
+                LOC: LSZH | HRS: 0.0 | MAINT: 0/500
             </div>
             
             <div class="input-group">
@@ -35,169 +30,183 @@
 
             <div style="display:flex; gap:10px; margin-top:15px;">
                 <button class="action-btn" onclick="startNewCareer()">✨ START NEW CAREER</button>
-                <button class="action-btn" id="btn-continue-career" onclick="continueCareer()" disabled>⏩ NEXT MONTH</button>
+                <button id="btn-continue-career" class="action-btn" style="background:#444;" onclick="continueCareer()">▶ CONTINUE</button>
             </div>
             
-            <div class="console-box" id="gen-console">
-                <div>> SYSTEM READY</div>
+            <div id="gen-console" style="margin-top:15px; background:#000; padding:10px; height:150px; overflow-y:auto; font-family:monospace; font-size:11px; color:#0f0; border:1px solid #333;">
+                > System Ready...
             </div>
         </div>
     </div>
 
     <div id="tab-roster" class="tab-content active">
-        <div id="roster-list">
+        <div id="roster-list" style="padding-bottom: 80px;">
             <div style="text-align:center; padding:20px; color:#666;">
-                NO FLIGHTS LOADED<br>
-                PLEASE GO TO [GEN] TAB
+                NO ROSTER DATA<br>Please go to GEN tab to generate flights.
             </div>
         </div>
     </div>
-    
+
     <div id="tab-dispatch" class="tab-content">
-        <div class="card">
-            <div class="section-title">FLIGHT DISPATCH</div>
-            <div id="dsp-flight" style="font-size:18px; color:#00bfff; font-weight:bold; margin-bottom:15px;">
-                NO FLIGHT SELECTED
-            </div>
-
-            <div id="dsp-warnings" style="margin-bottom:10px; min-height:5px;"></div>
-
-            <button class="action-btn" onclick="forceNewDispatch()">GENERATE / RE-CALCULATE</button>
-
-            <div class="separator"></div>
-
-            <div class="input-group">
-                <label for="pax-count">PASSENGERS</label>
-                <input type="number" id="pax-count" onchange="saveInputs()">
-            </div>
+        <div class="perf-card">
+            <div class="perf-title" id="dsp-flight">LX000 (LSZH-KJFK)</div>
             
             <div class="input-group">
-                <label>CARGO FWD (KG)</label>
-                <input type="number" id="cargo-fwd" onchange="saveInputs()">
-            </div>
-
-            <div class="input-group">
-                <label>CARGO AFT (KG)</label>
-                <input type="number" id="cargo-aft" onchange="saveInputs()">
+                <label for="pax-count">PASSENGERS / CARGO</label>
+                <input type="number" id="pax-count" readonly style="background:#222; color:#00bfff;">
             </div>
             
-            <div class="input-group">
-                <label>BLOCK FUEL (KG)</label>
-                <input type="number" id="fuel-total" onchange="saveInputs()">
+            <div class="two-col">
+                <div class="input-group">
+                    <label>CARGO FWD</label>
+                    <input type="number" id="cargo-fwd" readonly>
+                </div>
+                <div class="input-group">
+                    <label>CARGO AFT</label>
+                    <input type="number" id="cargo-aft" readonly>
+                </div>
             </div>
 
-            <div class="input-group">
-                <label>TRIP FUEL (KG)</label>
-                <input type="number" id="trip-fuel" disabled style="background:#222; color:#aaa;">
+            <div class="two-col">
+                <div class="input-group">
+                    <label>BLOCK FUEL</label>
+                    <input type="number" id="fuel-total" readonly style="color:#f1c40f;">
+                </div>
+                <div class="input-group">
+                    <label>TRIP FUEL</label>
+                    <input type="number" id="trip-fuel" readonly>
+                </div>
             </div>
 
-            <div class="result-box" style="margin-top:15px;">
-                <div>MAC ZFW: <span id="res-mac-zfw" style="float:right">--</span></div>
-                <div>TOW: <span id="res-tow" style="float:right">--</span></div>
-            </div>
+            <div id="dsp-warnings" style="margin:10px 0; min-height:20px;"></div>
+
+            <button class="action-btn" onclick="forceNewDispatch()">🔄 RE-CALCULATE LOADSHEET</button>
         </div>
     </div>
 
     <div id="tab-takeoff" class="tab-content">
-        <div class="card">
-            <div class="section-title">TAKEOFF PERFORMANCE</div>
-            <div id="to-flight-title" style="color:#00bfff; margin-bottom:10px;">--</div>
-
-            <div class="row">
-                <div class="input-group half">
-                    <label>RWY LEN (M)</label>
-                    <input type="number" id="to-rwy-len" value="3500">
-                </div>
-                <div class="input-group half">
-                    <label>ELEV (FT)</label>
-                    <div id="to-elev-disp" style="padding:10px; background:#222; border-radius:4px; text-align:right;">0</div>
-                </div>
+        <div class="perf-card">
+            <div class="perf-title" id="to-flight-title">NO FLIGHT SELECTED</div>
+            
+            <div class="input-group">
+                <label>RUNWAY LENGTH (M)</label>
+                <input type="number" id="to-rwy-len" value="3300">
             </div>
 
-            <div class="row">
-                <div class="input-group half">
-                    <label>OAT (°C)</label>
-                    <input type="number" id="to-oat" value="15">
-                </div>
-                <div class="input-group half">
-                    <label>COND</label>
+            <div class="two-col">
+                <div class="input-group">
+                    <label>RWY COND</label>
                     <select id="to-rwy-cond">
                         <option value="DRY">DRY</option>
                         <option value="WET">WET</option>
                     </select>
                 </div>
+                <div class="input-group">
+                    <label>SLOPE (%)</label>
+                    <input type="number" id="to-rwy-slope" value="0" step="0.1">
+                </div>
             </div>
 
             <div class="input-group">
-                <label>SLOPE (%)</label>
-                <input type="number" id="to-rwy-slope" value="0.0" step="0.1">
+                <label>OAT (°C)</label>
+                <input type="number" id="to-oat" placeholder="Enter Temp">
             </div>
 
-            <button class="action-btn" onclick="calculateTakeoff()">CALCULATE</button>
+            <div class="input-group" style="display:none;"> <span id="to-elev-disp">1416</span>
+            </div>
 
-            <div class="perf-section">
-                <div class="perf-row">
-                    <span>V1</span><span class="perf-val" id="res-v1">--</span>
+            <div class="result-grid" style="margin-top:15px; padding:10px; background:#222; border-radius:8px;">
+                <div class="res-item">
+                    <span class="res-label">V1</span>
+                    <span class="res-val" id="res-v1">---</span>
                 </div>
-                <div class="perf-row">
-                    <span>VR</span><span class="perf-val" id="res-vr">--</span>
+                <div class="res-item">
+                    <span class="res-label">VR</span>
+                    <span class="res-val" id="res-v2">---</span>
                 </div>
-                <div class="perf-row">
-                    <span>V2</span><span class="perf-val" id="res-v2">--</span>
+                <div class="res-item">
+                    <span class="res-label">V2</span>
+                    <span class="res-val" id="res-vr">---</span>
                 </div>
-                <div class="separator"></div>
-                <div class="perf-row">
-                    <span>TRIM</span><span class="perf-val" id="res-trim">--</span>
+                <div class="res-item">
+                    <span class="res-label">TRIM</span>
+                    <span class="res-val" id="res-trim">---</span>
                 </div>
-                <div class="perf-row">
-                    <span>FLEX</span><span class="perf-val" id="res-flex">--</span>
+                <div class="res-item">
+                    <span class="res-label">FLEX</span>
+                    <span class="res-val" id="res-flex" style="color:#f1c40f;">---</span>
                 </div>
             </div>
+            
+            <div style="margin-top:10px; text-align:right; font-size:12px; color:#aaa;">
+                TOW: <span id="res-tow">---</span> KG
+            </div>
+
+            <button class="action-btn" onclick="calculateTakeoff()">CALCULATE PERFORMANCE</button>
         </div>
-    </div>
+
+        <input type="hidden" id="pax-weight" value="0"> 
+        </div>
 
     <div id="tab-landing" class="tab-content">
-        <div class="card">
-            <div class="section-title">LANDING PERFORMANCE</div>
-            <div id="ldg-flight-desc" style="color:#888; font-size:12px; margin-bottom:10px;">--</div>
+        <div class="perf-card">
+            <div class="perf-title" id="ldg-flight-desc">ARRIVAL PERFORMANCE</div>
+            
+            <div class="input-group">
+                <label>RUNWAY LENGTH (M)</label>
+                <input type="number" id="ldg-rwy-len" value="3000">
+            </div>
 
-            <div class="row">
-                <div class="input-group half">
-                    <label>RWY AVAIL (M)</label>
-                    <input type="number" id="ldg-rwy-len" value="3000">
+            <div class="two-col">
+                <div class="input-group">
+                    <label>RWY COND</label>
+                    <select id="ldg-rwy-cond">
+                        <option value="DRY">DRY</option>
+                        <option value="WET">WET</option>
+                    </select>
                 </div>
-                <div class="input-group half">
-                    <label>REVERSER</label>
+                <div class="input-group">
+                    <label>REVERSERS</label>
                     <select id="ldg-rev">
                         <option value="YES">YES</option>
                         <option value="NO">NO</option>
                     </select>
                 </div>
             </div>
-
-            <div class="input-group">
-                <label>CONDITION</label>
-                <select id="ldg-rwy-cond">
-                    <option value="DRY">DRY</option>
-                    <option value="WET">WET</option>
-                </select>
+            
+            <div style="margin:10px 0; font-size:12px; color:#aaa;">
+                EST LDW: <span id="res-ldw" style="color:#fff;">---</span>
             </div>
 
-            <button class="action-btn" onclick="calculateLanding()">CALCULATE</button>
+            <button class="action-btn" onclick="calculateLanding()">CALCULATE LANDING</button>
 
-            <div class="result-box" style="margin-top:15px; text-align:center;">
-                EST. LDW: <span id="res-ldw" style="color:#00bfff; font-weight:bold;">--</span>
-            </div>
-
-            <div class="perf-section"></div>
+            <div class="perf-section" style="margin-top:20px;">
+                </div>
         </div>
+    </div>
+
+    <div class="nav-bar">
+        <button id="btn-generator" class="nav-btn" onclick="switchTab('generator')">
+            <div style="font-size:16px;">🎲</div>GEN
+        </button>
+        <button id="btn-roster" class="nav-btn active" onclick="switchTab('roster')">
+            <div style="font-size:16px;">📅</div>ROSTER
+        </button>
+        <button id="btn-dispatch" class="nav-btn" onclick="switchTab('dispatch')">
+            <div style="font-size:16px;">📝</div>DSP
+        </button>
+        <button id="btn-takeoff" class="nav-btn" onclick="switchTab('takeoff')">
+            <div style="font-size:16px;">🛫</div>PERF
+        </button>
+        <button id="btn-landing" class="nav-btn" onclick="switchTab('landing')">
+            <div style="font-size:16px;">🛬</div>LDG
+        </button>
     </div>
 
     <script src="weights.js"></script>
     <script src="airports.js"></script>
+    <script src="routes.js"></script>
     <script src="perf_db.js"></script>
-    <script src="routes.js"></script> 
-
     <script src="app.js"></script>
 
 </body>
