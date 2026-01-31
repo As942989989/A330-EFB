@@ -134,7 +134,10 @@ function confirmDispatch() {
     if(document.getElementById('cargo-fwd')) document.getElementById('cargo-fwd').value = s.cgoF;
     if(document.getElementById('cargo-aft')) document.getElementById('cargo-aft').value = s.cgoA;
     if(document.getElementById('fuel-total')) document.getElementById('fuel-total').value = s.fuel;
-    if(document.getElementById('trip-fuel')) document.getElementById('trip-fuel').value = Math.max(0, s.fuel - 5500);
+    
+    // Auto estimate Trip Fuel
+    let estTrip = Math.max(0, s.fuel - 5500);
+    if(document.getElementById('trip-fuel')) document.getElementById('trip-fuel').value = estTrip;
 
     if(typeof updatePaxWeight === 'function') updatePaxWeight();
     if(typeof updateTotalCargo === 'function') updateTotalCargo();
@@ -156,7 +159,9 @@ function computeInternalZFWCG() {
 }
 
 function calculateTakeoff() {
+    ensureWeights(); // 🟢 強制更新重量，防止隱藏欄位為空
     if(!window.perfDB || !window.weightDB) return;
+    
     let oat = parseFloat(document.getElementById('to-oat').value);
     if(isNaN(oat)) { alert("⚠️ Please Enter OAT"); return; }
     
@@ -166,8 +171,8 @@ function calculateTakeoff() {
     let elev = parseFloat(document.getElementById('to-elev-disp').innerText)||0;
 
     let oew = window.weightDB.oew;
-    let pax = parseFloat(document.getElementById('pax-weight').value)||0;
-    let cgo = parseFloat(document.getElementById('cargo-total').value)||0;
+    let pax = parseFloat(document.getElementById('pax-weight').value)||0; // 讀取隱藏欄位
+    let cgo = parseFloat(document.getElementById('cargo-total').value)||0; // 讀取隱藏欄位
     let fuel = parseFloat(document.getElementById('fuel-total').value)||0;
     let tow = oew + pax + cgo + fuel;
     
@@ -317,92 +322,32 @@ function calculateLanding() {
     if(typeof saveInputs === 'function') saveInputs();
 }
 
-// ==========================================
-// 補：跑道選擇與自動填入邏輯
-// ==========================================
-
-// 1. 更新跑道列表 (被 app.js 呼叫)
-function updateRunwayLists(flightId) {
-    let f = window.flightDB[flightId];
-    if(!f) return;
+// 🟢 新增：重量計算輔助函數 (被 HTML oninput 呼叫)
+function updatePaxWeight() {
+    let countEl = document.getElementById('pax-count');
+    if(!countEl) return;
     
-    // 解析起降機場 (例如 "LSZH-KJFK")
-    let pair = f.r.split('-');
-    let depICAO = pair[0];
-    let arrICAO = pair[1];
+    let count = parseFloat(countEl.value) || 0;
+    let unit = (window.weightDB && window.weightDB.pax_unit) ? window.weightDB.pax_unit : 77;
+    let total = count * unit;
 
-    populateDropdown('to-rwy-select', depICAO);
-    populateDropdown('ldg-rwy-select', arrICAO);
+    let dispEl = document.getElementById('pax-weight-disp');
+    if(dispEl) dispEl.innerText = total;
+
+    let hiddenEl = document.getElementById('pax-weight');
+    if(hiddenEl) hiddenEl.value = total;
 }
 
-// 2. 填充下拉選單的輔助函數
-function populateDropdown(elmId, icao) {
-    let el = document.getElementById(elmId);
-    if(!el) return;
-    
-    // 清空並重設預設值
-    el.innerHTML = '<option value="">MANUAL INPUT</option>';
-    
-    let airport = window.airportDB[icao];
-    if(!airport) return;
+function updateTotalCargo() {
+    let fwd = parseFloat(document.getElementById('cargo-fwd').value) || 0;
+    let aft = parseFloat(document.getElementById('cargo-aft').value) || 0;
+    let total = fwd + aft;
 
-    // 遍歷跑道並建立選項
-    for(let rwy in airport.runways) {
-        let opt = document.createElement('option');
-        opt.value = rwy; // 例如 "16"
-        opt.innerText = `RWY ${rwy}`;
-        el.appendChild(opt);
-    }
+    let hiddenEl = document.getElementById('cargo-total');
+    if(hiddenEl) hiddenEl.value = total;
 }
 
-// 3. 應用跑道數據 (HTML onchange 呼叫此函數)
-function applyRunway(type) {
-    // type: 'to' (起飛) 或 'ldg' (降落)
-    let selectId = type + '-rwy-select';
-    let rwyCode = document.getElementById(selectId).value;
-    
-    // 找出目前的機場 ICAO
-    let flightId = currentDispatchState.flightId;
-    if(!flightId) return;
-    let f = window.flightDB[flightId];
-    let pair = f.r.split('-');
-    let icao = (type === 'to') ? pair[0] : pair[1];
-
-    let airport = window.airportDB[icao];
-    if(!airport) return;
-
-    // 顯示標高
-    document.getElementById(type + '-elev-disp').innerText = airport.elev;
-
-    if(rwyCode === "") {
-        // 如果選回 Manual，隱藏資訊列
-        document.getElementById(type + '-rwy-info').style.display = 'none';
-        return;
-    }
-
-    let rwyData = airport.runways[rwyCode];
-    if(rwyData) {
-        // 填入數據
-        document.getElementById(type + '-rwy-len').value = rwyData.len;
-        document.getElementById(type + '-rwy-hdg').value = rwyData.hdg;
-        document.getElementById(type + '-rwy-slope').value = rwyData.slope;
-        
-        // 顯示資訊列
-        let infoEl = document.getElementById(type + '-rwy-info');
-        infoEl.style.display = 'flex';
-        infoEl.innerHTML = `
-            <div>ID: ${icao}</div>
-            <div>RWY: ${rwyCode}</div>
-            <div>ELEV: ${airport.elev}'</div>
-        `;
-    }
-    
-    // 嘗試儲存輸入 (如果 saveInputs 存在)
-    if(typeof saveInputs === 'function') saveInputs();
+function ensureWeights() {
+    updatePaxWeight();
+    updateTotalCargo();
 }
-
-// 4. 簡單的輸入保存 (防止 console 報錯)
-function saveInputs() {
-    // 這裡可以擴充 LocalStorage 保存邏輯，目前留空即可防止報錯
-}
-
