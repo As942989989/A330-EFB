@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 A330 Flight Computer v4.8 (Final)
+// 🧠 A330 Flight Computer v4.9 (Updated with 10k Limit)
 // ==========================================
 
 // --- Dispatch State & Logic ---
@@ -36,7 +36,7 @@ function generateNewDispatch(flightId) {
     currentDispatchState.isSaved = false;
     let tags = f.tags || [];
 
-    // Pax
+    // --- 1. Passenger Logic (Max 441) ---
     let basePax = 441;
     let lf = rnd(70, 95) / 100;
     if (tags.includes("PREIGHTER")) {
@@ -49,7 +49,7 @@ function generateNewDispatch(flightId) {
         currentDispatchState.pax = Math.floor(basePax * lf);
     }
 
-    // Cargo
+    // --- 2. Cargo Logic (Total Calculation) ---
     let paxWt = currentDispatchState.pax * 77;
     let oew = 129855;
     let roomForCargo = 175000 - (oew + paxWt); // MZFW Limit
@@ -63,12 +63,21 @@ function generateNewDispatch(flightId) {
     }
     currentDispatchState.cgoTotal = Math.max(0, Math.floor(cgoTarget));
 
-    // Split Cargo
+    // --- 3. Split Cargo (🟢 MODIFIED: 10,000kg Limit applied here) ---
     let fwdRatio = tags.includes("PREIGHTER") ? 0.52 : 0.55;
-    currentDispatchState.cgoF = Math.floor(currentDispatchState.cgoTotal * fwdRatio);
-    currentDispatchState.cgoA = currentDispatchState.cgoTotal - currentDispatchState.cgoF;
 
-    // Fuel
+    // 原始分配計算
+    let rawFwd = Math.floor(currentDispatchState.cgoTotal * fwdRatio);
+    let rawAft = currentDispatchState.cgoTotal - rawFwd;
+
+    // 強制限制：單一貨艙不得超過 10,000 kg
+    currentDispatchState.cgoF = Math.min(rawFwd, 10000);
+    currentDispatchState.cgoA = Math.min(rawAft, 10000);
+
+    // 重新計算總重 (因為超出 10k 的部分被切除了)
+    currentDispatchState.cgoTotal = currentDispatchState.cgoF + currentDispatchState.cgoA;
+
+    // --- 4. Fuel Logic ---
     currentDispatchState.ci = tags.includes("SHUTTLE") ? 80 : rnd(20, 60);
     let tripFuel = (f.dist * 12.5) + (currentDispatchState.cgoTotal/1000 * 0.04 * f.dist);
     currentDispatchState.fuel = Math.round(tripFuel + 5500); 
@@ -322,7 +331,7 @@ function calculateLanding() {
     if(typeof saveInputs === 'function') saveInputs();
 }
 
-// 🟢 新增：重量計算輔助函數 (被 HTML oninput 呼叫)
+// 🟢 Helper Functions for Weights (HTML oninput calls)
 function updatePaxWeight() {
     let countEl = document.getElementById('pax-count');
     if(!countEl) return;
