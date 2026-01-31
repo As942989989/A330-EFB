@@ -1,11 +1,8 @@
 // ==========================================
-// 📅 A330 Career System (Generator + Roster UI)
+// 📅 A330 Career System (Generator Logic Only)
 // ==========================================
+// ⚠️ UI 顯示邏輯已移至 app.js，此處僅保留後台生成邏輯
 
-// --- Roster State ---
-let completedFlights = JSON.parse(safeGet('a330_completed_v4')) || {};
-
-// --- Generator Logic ---
 const Generator = {
     state: {
         base: "LSZH",           // 生涯基地
@@ -16,13 +13,16 @@ const Generator = {
         history: []             
     },
     rnd: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min,
+    
     load: () => {
         let s = localStorage.getItem('a330_career_state');
         if(s) Generator.state = JSON.parse(s);
     },
+    
     save: () => {
         localStorage.setItem('a330_career_state', JSON.stringify(Generator.state));
     },
+    
     reset: (base) => {
         Generator.state = {
             base: base || "LSZH",
@@ -34,6 +34,7 @@ const Generator = {
         };
         Generator.save();
     },
+    
     generateMonth: function() {
         let roster = {};
         let dayCounter = 1;
@@ -56,46 +57,57 @@ const Generator = {
         Generator.save();
         return roster;
     },
+    
     createDailyFlight: function(day) {
         let s = Generator.state;
         let db = window.routeDB;
         let flightId = `Day ${String(day).padStart(2, '0')}`;
         
+        // 1. 強制維修
         if (s.maintCounter > 500) return Generator.createMaintFlight(flightId, s.location, s.base);
 
         let candidates = db.regular.filter(r => r.route.startsWith(s.location));
         
+        // 2. 在外站 (非 LSZH/LSGG)
         if (!["LSZH", "LSGG"].includes(s.location)) {
+            // 嘗試接飛回程 (Same aircraft turnaround)
             if (s.lastFlightNum) {
                 let targetNum = s.lastFlightNum % 2 === 0 ? s.lastFlightNum + 1 : s.lastFlightNum; 
                 let match = candidates.find(c => c.inbound.includes(targetNum));
                 if (match) return Generator.buildFlight(flightId, match, "INBOUND", targetNum);
             }
+            // 隨機回程
             let randomReturn = candidates[Generator.rnd(0, candidates.length - 1)];
             if(randomReturn) {
                  let fNum = randomReturn.inbound[Generator.rnd(0, randomReturn.inbound.length-1)];
                  return Generator.buildFlight(flightId, randomReturn, "INBOUND", fNum);
             }
+            // 沒得飛，空機調度回基地
             return Generator.createFerryFlight(flightId, s.location, s.base);
         }
 
+        // 3. 在基地 - 隨機觸發包機 (5% 機率)
         let dice = Generator.rnd(1, 100);
         if (dice <= 5) {
             let charterDest = db.charters[Generator.rnd(0, db.charters.length-1)];
             return Generator.createCharterFlight(flightId, s.location, charterDest);
         }
 
+        // 4. 在基地 - 正常航班
         let potentialRoutes = db.regular.filter(r => r.route.startsWith(s.location));
         if(potentialRoutes.length > 0) {
             let selectedRoute = potentialRoutes[Generator.rnd(0, potentialRoutes.length-1)];
             let fNum = selectedRoute.outbound[Generator.rnd(0, selectedRoute.outbound.length-1)];
+            // 客改貨機率 (15%)
             let isPreighter = (selectedRoute.isCargoHotspot && Generator.rnd(1, 100) <= 15);
             return Generator.buildFlight(flightId, selectedRoute, "OUTBOUND", fNum, isPreighter);
         } else {
+            // 沒航班，做樞紐接駁
             let targetHub = s.location === "LSZH" ? "LSGG" : "LSZH";
             return Generator.createShuttleFlight(flightId, s.location, targetHub);
         }
     },
+    
     buildFlight: function(id, routeData, dir, fNum, isPreighter) {
         let dest = routeData.route.split('-')[1];
         let tags = [];
@@ -111,6 +123,7 @@ const Generator = {
             dest: dest, tags: tags, d: `${tags.join(' | ')}`
         };
     },
+    
     createMaintFlight: function(id, from, to) {
         let num = "LX" + Generator.rnd(9000, 9999);
         return {
@@ -118,6 +131,7 @@ const Generator = {
             type: "MAINT", profile: "FERRY", dest: to, tags: ["MAINT", "FERRY"], d: "🛠️ MANDATORY MAINTENANCE"
         };
     },
+    
     createFerryFlight: function(id, from, to) {
         let num = "LX" + Generator.rnd(9000, 9999);
         return {
@@ -125,6 +139,7 @@ const Generator = {
             type: "FERRY", profile: "FERRY", dest: to, tags: ["FERRY"], d: "⚠️ POSITIONING FLIGHT"
         };
     },
+    
     createShuttleFlight: function(id, from, to) {
          let num = "LX" + Generator.rnd(2800, 2819);
          return {
@@ -132,6 +147,7 @@ const Generator = {
             type: "PAX", profile: "BIZ", dest: to, tags: ["SHUTTLE"], d: "🇨🇭 HUB SHUTTLE"
         };
     },
+    
     createCharterFlight: function(id, from, destObj) {
         let num = "LX" + Generator.rnd(8000, 8999);
         return {
@@ -140,96 +156,3 @@ const Generator = {
         };
     }
 };
-
-// --- Roster Management & UI ---
-function loadRosterFromStorage() {
-    let savedRoster = localStorage.getItem('a330_roster_data');
-    if (savedRoster) {
-        window.flightDB = JSON.parse(savedRoster);
-        console.log("✅ Roster loaded.");
-    } else {
-        window.flightDB = {};
-        console.log("⚠️ No roster found.");
-    }
-}
-
-function renderRoster() {
-    const list = document.getElementById('roster-list');
-    if(!list) return;
-    list.innerHTML = '';
-    
-    if(!window.flightDB || Object.keys(window.flightDB).length === 0) {
-        list.innerHTML = `<div style="text-align:center; padding:20px; color:#666;">NO ROSTER DATA<br>Go to GENERATOR tab.</div>`;
-        return;
-    }
-
-    for (const [k, v] of Object.entries(window.flightDB)) {
-        let badgeColor = "#00bfff";
-        let icon = "✈️";
-        if (v.tags.includes("MAINT")) { badgeColor = "#e74c3c"; icon = "🛠️"; }
-        else if (v.tags.includes("PREIGHTER")) { badgeColor = "#9b59b6"; icon = "📦"; }
-        else if (v.tags.includes("SHUTTLE")) { badgeColor = "#95a5a6"; icon = "🚌"; }
-        else if (v.tags.includes("CHARTER")) { badgeColor = "#f1c40f"; icon = "🏖️"; }
-
-        const d = document.createElement('div');
-        d.className = `flight-card ${completedFlights[k]?'completed':''}`;
-        d.onclick = () => loadFlight(k); 
-        d.innerHTML = `
-            <div class="flight-info">
-                <div class="flight-day" style="color:${badgeColor}">${v.day} | ${v.id}</div>
-                <div class="flight-route">${v.r}</div>
-                <div style="font-size:11px; color:#aaa; margin-top:4px;">${icon} ${v.d}</div>
-            </div>
-            <button class="check-btn" onclick="event.stopPropagation(); toggle('${k}')">✓</button>
-        `;
-        list.appendChild(d);
-    }
-}
-
-function toggle(k) {
-    if(completedFlights[k]) delete completedFlights[k]; else completedFlights[k]=true;
-    safeSet('a330_completed_v4', JSON.stringify(completedFlights));
-    renderRoster();
-}
-
-// --- Generator UI Functions ---
-function updateGeneratorUI() {
-    let s = Generator.state;
-    let statusEl = document.getElementById('gen-status-text');
-    if(statusEl) {
-        statusEl.innerHTML = `Loc: <span style="color:#00bfff">${s.location}</span> | Hrs: ${s.totalHours.toFixed(1)} | Maint: ${s.maintCounter.toFixed(1)}/500h`;
-    }
-    let btnCont = document.getElementById('btn-continue-career');
-    if(btnCont) btnCont.disabled = (s.totalHours === 0);
-}
-
-function startNewCareer() {
-    let base = document.getElementById('base-select').value;
-    if(confirm(`Start new career at ${base}? Previous data will be lost.`)) {
-        Generator.reset(base);
-        generateAndLoad();
-    }
-}
-
-function continueCareer() {
-    generateAndLoad();
-}
-
-function generateAndLoad() {
-    logToConsole("🔄 Generating Roster...");
-    let newRoster = Generator.generateMonth();
-    localStorage.setItem('a330_roster_data', JSON.stringify(newRoster));
-    loadRosterFromStorage(); 
-    renderRoster();
-    updateGeneratorUI();
-    logToConsole(`✅ Generated ${Object.keys(newRoster).length} flights.`);
-    switchTab('roster');
-}
-
-function logToConsole(msg) {
-    let el = document.getElementById('gen-console');
-    if(el) {
-        el.innerHTML += `<div>> ${msg}</div>`;
-        el.scrollTop = el.scrollHeight;
-    }
-}
