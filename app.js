@@ -1,5 +1,5 @@
 // ==========================================
-// 📱 A330 EFB App Controller v4.8 (Final)
+// 📱 A330 EFB App Controller v4.9 (Fixed Missing Function)
 // ==========================================
 
 let completedFlights = JSON.parse(safeGet('a330_completed_v4')) || {};
@@ -11,7 +11,7 @@ window.onload = function() {
     // 2. 設置標題
     let titleEl = document.querySelector('.nav-header');
     if(titleEl) {
-        titleEl.innerHTML = `A330 EFB <span style="font-size:12px; color:#00ff00;">v4.8 FINAL</span>` + 
+        titleEl.innerHTML = `A330 EFB <span style="font-size:12px; color:#00ff00;">v4.9 READY</span>` + 
                             `<button class="reset-btn" onclick="clearAllData()">RESET</button>`;
     }
 
@@ -20,18 +20,17 @@ window.onload = function() {
     
     // 4. 初始化 UI
     updateGeneratorUI(); 
-    loadRosterFromStorage(); 
+    loadRosterFromStorage(); // 這裡呼叫，下面必須要有定義！
     renderRoster(); 
 
-    // 5. 🚀 關鍵修復：恢復上次活躍的航班狀態
+    // 5. 恢復上次活躍的航班狀態
     let lastActiveFlight = localStorage.getItem('a330_active_flight');
     if (lastActiveFlight && window.flightDB[lastActiveFlight]) {
-        // 靜默加載航班數據，不強制切換分頁，以便後續 loadInputs 能找到機場
         loadFlightDataOnly(lastActiveFlight);
     }
 
-    // 6. 載入上次輸入 (這時已經知道機場了，所以跑道選單能正確還原)
-    try { if(typeof loadInputs === 'function') loadInputs(); } catch(e) { console.error(e); }
+    // 6. 載入上次輸入
+    try { if(typeof loadInputs === 'function') loadInputs(); } catch(e) {}
 };
 
 // --- Generator UI Logic ---
@@ -67,9 +66,11 @@ function generateAndLoad() {
     logToConsole("🔄 Generating Roster...");
     let newRoster = Generator.generateMonth();
     localStorage.setItem('a330_roster_data', JSON.stringify(newRoster));
-    loadRosterFromStorage(); 
+    
+    loadRosterFromStorage(); // 🔴 之前就是死在這裡
     renderRoster();
     updateGeneratorUI();
+    
     logToConsole(`✅ Generated ${Object.keys(newRoster).length} flights.`);
     switchTab('roster');
 }
@@ -82,7 +83,18 @@ function logToConsole(msg) {
     }
 }
 
-// --- Roster UI ---
+// --- Roster UI & Logic ---
+
+// 🟢 [補回] 這是之前遺失的關鍵函數！
+function loadRosterFromStorage() {
+    let savedRoster = localStorage.getItem('a330_roster_data');
+    if (savedRoster) {
+        window.flightDB = JSON.parse(savedRoster);
+    } else {
+        window.flightDB = {};
+    }
+}
+
 function renderRoster() {
     const list = document.getElementById('roster-list');
     if(!list) return;
@@ -136,30 +148,22 @@ function toggle(k) {
     renderRoster();
 }
 
-// 完整加載航班並切換分頁 (使用者點擊時)
 function loadFlight(k) {
-    loadFlightDataOnly(k); // 執行數據加載
-    switchTab('dispatch'); // 切換分頁
+    loadFlightDataOnly(k);
+    switchTab('dispatch'); 
 }
 
-// 僅加載數據 (用於重整頁面時恢復狀態)
 function loadFlightDataOnly(k) {
     if(!window.flightDB[k]) return;
     const d = window.flightDB[k];
-    
-    // 🟢 保存當前活躍航班 ID (關鍵修復)
     localStorage.setItem('a330_active_flight', k);
     
-    // 更新標題
     ['to-flight-title', 'ldg-flight-desc', 'dsp-flight'].forEach(id => {
         let el = document.getElementById(id);
         if(el) el.innerText = d.id + " (" + d.r + ")";
     });
 
-    // 更新跑道列表
     updateRunwayLists(k);
-
-    // 啟動 Dispatch 模組
     initDispatchSession(k); 
 }
 
@@ -170,9 +174,7 @@ function clearAllData() {
     }
 }
 
-// ==========================================
-// 跑道選擇與介面邏輯 (UI Logic)
-// ==========================================
+// --- Runway & Data Logic ---
 
 function updateRunwayLists(flightId) {
     let f = window.flightDB[flightId];
@@ -190,9 +192,7 @@ function populateDropdown(elmId, icao) {
     let el = document.getElementById(elmId);
     if(!el) return;
     
-    // 暫存當前選擇的值 (防止重繪時丟失選擇)
     let currentVal = el.value;
-    
     el.innerHTML = '<option value="">MANUAL INPUT</option>';
     
     let airport = window.airportDB[icao];
@@ -205,19 +205,15 @@ function populateDropdown(elmId, icao) {
         el.appendChild(opt);
     }
     
-    // 如果之前選的值還在列表裡，選回來
     if(currentVal) el.value = currentVal;
 }
 
 function applyRunway(type) {
-    // type: 'to' (起飛) 或 'ldg' (降落)
     let selectId = type + '-rwy-select';
     let elSelect = document.getElementById(selectId);
     if(!elSelect) return;
 
     let rwyCode = elSelect.value;
-    
-    // 找出目前的機場 ICAO
     let flightId = currentDispatchState.flightId;
     if(!flightId) return;
     let f = window.flightDB[flightId];
@@ -227,9 +223,7 @@ function applyRunway(type) {
     let airport = window.airportDB[icao];
     if(!airport) return;
 
-    let elevEl = document.getElementById(type + '-elev-disp');
-    if(elevEl) elevEl.innerText = airport.elev;
-
+    document.getElementById(type + '-elev-disp').innerText = airport.elev;
     let infoEl = document.getElementById(type + '-rwy-info');
 
     if(rwyCode === "") {
@@ -254,10 +248,6 @@ function applyRunway(type) {
     }
     saveInputs();
 }
-
-// ==========================================
-// 補：輸入資料保存與讀取 (Persistence)
-// ==========================================
 
 function saveInputs() {
     let inputs = {};
@@ -293,16 +283,12 @@ function loadInputs() {
         let el = document.getElementById(id);
         if(el) {
             el.value = val;
-            // 這裡不自動觸發 applyRunway，因為會覆蓋掉手動輸入的數值
-            // 只有當 Select 被改變時，我們才需要更新資訊列
             if ((id === 'to-rwy-select' || id === 'ldg-rwy-select') && val !== "") {
-                // 恢復選單選取狀態，但稍後再執行 applyRunway 以確保 DOM 就緒
                 setTimeout(() => {
                     if(el.value === val) {
-                        // 僅更新顯示資訊，不覆寫已經載入的 manual inputs (len/slope)
                         let type = id.startsWith('to') ? 'to' : 'ldg';
                         let infoEl = document.getElementById(type + '-rwy-info');
-                        if(infoEl) infoEl.style.display = 'flex'; // 僅恢復顯示
+                        if(infoEl) infoEl.style.display = 'flex'; 
                     }
                 }, 100);
             }
