@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 A330 Flight Computer (Dispatch & Perf)
+// 🧠 A330 Flight Computer v4.8 (Final)
 // ==========================================
 
 // --- Dispatch State & Logic ---
