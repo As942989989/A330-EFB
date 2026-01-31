@@ -1,5 +1,5 @@
 // ==========================================
-// 🛫 A330 Performance Calculator (TO/LDG)
+// 🛫 A330 Performance Calculator (v5.0 Realism Physics)
 // ==========================================
 
 function computeInternalZFWCG() {
@@ -7,6 +7,7 @@ function computeInternalZFWCG() {
     let paxWt = parseFloat(document.getElementById('pax-weight').value) || 0;
     let fwdWt = parseFloat(document.getElementById('cargo-fwd').value) || 0;
     let aftWt = parseFloat(document.getElementById('cargo-aft').value) || 0;
+    // 重心公式
     let cg = BASE_CG + (paxWt * 0.00020) + (fwdWt * -0.00050) + (aftWt * 0.00070);
     return Math.max(18, Math.min(42, cg));
 }
@@ -58,11 +59,18 @@ function calculateTakeoff() {
         baseTOD *= thrustPenaltyFactor; 
         baseTOD *= corr.dist_factor;    
         
+        // Slope Physics
         if (slope > 0) baseTOD *= (1 + (slope * window.perfDB.runway_physics.slope_dist_factor));
         if (slope < 0) baseTOD *= (1 + (slope * window.perfDB.runway_physics.slope_dist_factor * 0.5));
-        baseTOD *= (1 + (elev/1000 * 0.05)); 
+        
+        // [REALISM UPDATE] Altitude Penalty (Exponential)
+        // 氣壓固定 1013 下，標高即壓力高度。
+        // 空氣稀薄對噴氣引擎是致命的：每 1000ft 增加約 8% 距離，且呈現指數增長
+        let altFactor = 1 + (elev / 1000 * 0.08) + Math.pow(elev / 1000, 2) * 0.01;
+        baseTOD *= altFactor;
 
-        if (isWet) baseTOD *= 1.1;
+        // 濕地懲罰 (Wet Physics)
+        if (isWet) baseTOD *= 1.15;
 
         let margin = rwyLen - baseTOD;
         
@@ -99,7 +107,7 @@ function calculateTakeoff() {
     }
 
     if (!bestResult) {
-        alert("⚠️ PERFORMANCE LIMIT EXCEEDED (Too Heavy or Runway Short)");
+        alert("⚠️ PERFORMANCE LIMIT EXCEEDED (Too Heavy / High Alt / Short Rwy)");
         document.getElementById('res-tow').style.color = "red";
         document.getElementById('res-tow').innerText = "LIMIT EXCEEDED";
         return;
@@ -164,6 +172,7 @@ function calculateLanding() {
     let wspd = parseFloat(document.getElementById('ldg-wind-spd').value)||0;
     let rhdg = parseFloat(document.getElementById('ldg-rwy-hdg').value)||0;
     
+    // Wind Component Calculation
     let angleRad = Math.abs(rhdg - wdir) * (Math.PI / 180);
     let hw = Math.cos(angleRad) * wspd;
 
@@ -183,7 +192,10 @@ function calculateLanding() {
     scenarios.forEach(sc => {
         let vls = interpolateVLS(ldw, window.perfDB.landing_vls_full);
         if (sc.conf === '3') vls += window.perfDB.landing_conf3_add;
-        let windCorr = Math.max(5, Math.min(15, hw / 3)); 
+        
+        // [REALISM UPDATE] Airbus Standard Vapp Logic
+        // Vapp = VLS + Max(5, min(20, 1/3 HW))
+        let windCorr = Math.max(5, Math.min(20, hw / 3));
         let vapp = Math.round(vls + windCorr);
 
         let dist = dp.base_ld_dist_ft * (ldw / 180000); 
@@ -266,4 +278,3 @@ function calculateLanding() {
 
     if(typeof saveInputs === 'function') saveInputs();
 }
-
