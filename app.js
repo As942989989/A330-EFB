@@ -59,13 +59,10 @@ function continueCareer() {
 function generateAndLoad() {
     logToConsole("🔄 Generating Roster...");
     let newRoster = Generator.generateMonth();
-    
     localStorage.setItem('a330_roster_data', JSON.stringify(newRoster));
-    
     loadRosterFromStorage(); 
     renderRoster();
     updateGeneratorUI();
-    
     logToConsole(`✅ Generated ${Object.keys(newRoster).length} flights.`);
     switchTab('roster');
 }
@@ -136,13 +133,13 @@ function loadFlight(k) {
     if(!window.flightDB[k]) return;
     const d = window.flightDB[k];
     
-    // 更新標題
+    // 更新所有相關的標題
     ['to-flight-title', 'ldg-flight-desc', 'dsp-flight'].forEach(id => {
         let el = document.getElementById(id);
         if(el) el.innerText = d.id + " (" + d.r + ")";
     });
 
-    // 🟢 關鍵修正：更新跑道列表
+    // 🟢 更新跑道列表
     updateRunwayLists(k);
 
     // 啟動 Dispatch 模組
@@ -158,15 +155,13 @@ function clearAllData() {
 }
 
 // ==========================================
-// 補：跑道選擇與介面邏輯 (UI Logic)
+// 跑道選擇與介面邏輯 (UI Logic)
 // ==========================================
 
-// 1. 更新跑道列表
 function updateRunwayLists(flightId) {
     let f = window.flightDB[flightId];
     if(!f) return;
     
-    // 解析起降機場 (例如 "LSZH-KJFK")
     let pair = f.r.split('-');
     let depICAO = pair[0];
     let arrICAO = pair[1];
@@ -175,18 +170,15 @@ function updateRunwayLists(flightId) {
     populateDropdown('ldg-rwy-select', arrICAO);
 }
 
-// 2. 填充下拉選單
 function populateDropdown(elmId, icao) {
     let el = document.getElementById(elmId);
     if(!el) return;
     
-    // 清空並重設
     el.innerHTML = '<option value="">MANUAL INPUT</option>';
     
     let airport = window.airportDB[icao];
     if(!airport) return;
 
-    // 建立選項
     for(let rwy in airport.runways) {
         let opt = document.createElement('option');
         opt.value = rwy;
@@ -195,7 +187,6 @@ function populateDropdown(elmId, icao) {
     }
 }
 
-// 3. 應用跑道數據 (HTML onchange 呼叫)
 function applyRunway(type) {
     // type: 'to' (起飛) 或 'ldg' (降落)
     let selectId = type + '-rwy-select';
@@ -211,7 +202,6 @@ function applyRunway(type) {
     let airport = window.airportDB[icao];
     if(!airport) return;
 
-    // 顯示標高
     document.getElementById(type + '-elev-disp').innerText = airport.elev;
 
     if(rwyCode === "") {
@@ -221,12 +211,10 @@ function applyRunway(type) {
 
     let rwyData = airport.runways[rwyCode];
     if(rwyData) {
-        // 填入數據
         document.getElementById(type + '-rwy-len').value = rwyData.len;
         document.getElementById(type + '-rwy-hdg').value = rwyData.hdg;
         document.getElementById(type + '-rwy-slope').value = rwyData.slope;
         
-        // 顯示資訊列
         let infoEl = document.getElementById(type + '-rwy-info');
         infoEl.style.display = 'flex';
         infoEl.innerHTML = `
@@ -238,6 +226,49 @@ function applyRunway(type) {
     saveInputs();
 }
 
+// ==========================================
+// 補：輸入資料保存與讀取 (Persistence)
+// ==========================================
+
 function saveInputs() {
-    // 這裡可以保留擴充空間，目前留空即可
+    let inputs = {};
+    const ids = [
+        'to-rwy-len', 'to-rwy-hdg', 'to-rwy-slope', 'to-rwy-cond', 
+        'to-wind-dir', 'to-wind-spd', 'to-oat', 
+        'pax-count', 'cargo-fwd', 'cargo-aft', 'fuel-total', 'trip-fuel',
+        'ldg-rwy-len', 'ldg-rwy-hdg', 'ldg-rwy-slope', 'ldg-rwy-cond',
+        'ldg-wind-dir', 'ldg-wind-spd', 'ldg-rev', 'ldg-gw-input'
+    ];
+
+    ids.forEach(id => {
+        let el = document.getElementById(id);
+        if(el) inputs[id] = el.value;
+    });
+
+    let toSel = document.getElementById('to-rwy-select');
+    if(toSel) inputs['to-rwy-select'] = toSel.value;
+    
+    let ldgSel = document.getElementById('ldg-rwy-select');
+    if(ldgSel) inputs['ldg-rwy-select'] = ldgSel.value;
+
+    localStorage.setItem('a330_user_inputs', JSON.stringify(inputs));
+}
+
+function loadInputs() {
+    let data = localStorage.getItem('a330_user_inputs');
+    if(!data) return;
+    
+    let inputs = JSON.parse(data);
+    
+    for (const [id, val] of Object.entries(inputs)) {
+        let el = document.getElementById(id);
+        if(el) {
+            el.value = val;
+            if(id === 'to-rwy-select' && val !== "") applyRunway('to');
+            if(id === 'ldg-rwy-select' && val !== "") applyRunway('ldg');
+        }
+    }
+    
+    if(typeof updatePaxWeight === 'function') updatePaxWeight();
+    if(typeof updateTotalCargo === 'function') updateTotalCargo();
 }
