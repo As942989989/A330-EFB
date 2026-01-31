@@ -316,3 +316,93 @@ function calculateLanding() {
 
     if(typeof saveInputs === 'function') saveInputs();
 }
+
+// ==========================================
+// 補：跑道選擇與自動填入邏輯
+// ==========================================
+
+// 1. 更新跑道列表 (被 app.js 呼叫)
+function updateRunwayLists(flightId) {
+    let f = window.flightDB[flightId];
+    if(!f) return;
+    
+    // 解析起降機場 (例如 "LSZH-KJFK")
+    let pair = f.r.split('-');
+    let depICAO = pair[0];
+    let arrICAO = pair[1];
+
+    populateDropdown('to-rwy-select', depICAO);
+    populateDropdown('ldg-rwy-select', arrICAO);
+}
+
+// 2. 填充下拉選單的輔助函數
+function populateDropdown(elmId, icao) {
+    let el = document.getElementById(elmId);
+    if(!el) return;
+    
+    // 清空並重設預設值
+    el.innerHTML = '<option value="">MANUAL INPUT</option>';
+    
+    let airport = window.airportDB[icao];
+    if(!airport) return;
+
+    // 遍歷跑道並建立選項
+    for(let rwy in airport.runways) {
+        let opt = document.createElement('option');
+        opt.value = rwy; // 例如 "16"
+        opt.innerText = `RWY ${rwy}`;
+        el.appendChild(opt);
+    }
+}
+
+// 3. 應用跑道數據 (HTML onchange 呼叫此函數)
+function applyRunway(type) {
+    // type: 'to' (起飛) 或 'ldg' (降落)
+    let selectId = type + '-rwy-select';
+    let rwyCode = document.getElementById(selectId).value;
+    
+    // 找出目前的機場 ICAO
+    let flightId = currentDispatchState.flightId;
+    if(!flightId) return;
+    let f = window.flightDB[flightId];
+    let pair = f.r.split('-');
+    let icao = (type === 'to') ? pair[0] : pair[1];
+
+    let airport = window.airportDB[icao];
+    if(!airport) return;
+
+    // 顯示標高
+    document.getElementById(type + '-elev-disp').innerText = airport.elev;
+
+    if(rwyCode === "") {
+        // 如果選回 Manual，隱藏資訊列
+        document.getElementById(type + '-rwy-info').style.display = 'none';
+        return;
+    }
+
+    let rwyData = airport.runways[rwyCode];
+    if(rwyData) {
+        // 填入數據
+        document.getElementById(type + '-rwy-len').value = rwyData.len;
+        document.getElementById(type + '-rwy-hdg').value = rwyData.hdg;
+        document.getElementById(type + '-rwy-slope').value = rwyData.slope;
+        
+        // 顯示資訊列
+        let infoEl = document.getElementById(type + '-rwy-info');
+        infoEl.style.display = 'flex';
+        infoEl.innerHTML = `
+            <div>ID: ${icao}</div>
+            <div>RWY: ${rwyCode}</div>
+            <div>ELEV: ${airport.elev}'</div>
+        `;
+    }
+    
+    // 嘗試儲存輸入 (如果 saveInputs 存在)
+    if(typeof saveInputs === 'function') saveInputs();
+}
+
+// 4. 簡單的輸入保存 (防止 console 報錯)
+function saveInputs() {
+    // 這裡可以擴充 LocalStorage 保存邏輯，目前留空即可防止報錯
+}
+
