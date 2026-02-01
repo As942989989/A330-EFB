@@ -1,6 +1,7 @@
 // ==========================================
-// 📅 A330 Career System (Generator Logic v3 - Fix E Gate)
+// 📅 A330 Career System (Generator Logic v4.0)
 // ==========================================
+// 包含：班表生成、機位分配 (GateDB)、維修邏輯
 
 const Generator = {
     state: {
@@ -12,22 +13,27 @@ const Generator = {
         lastFlightNum: null,    // 上一腿班號
         history: []             
     },
+
+    // 工具：隨機整數
     rnd: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min,
     
+    // 讀取存檔
     load: () => {
         let s = localStorage.getItem('a330_career_state');
         if(s) Generator.state = JSON.parse(s);
     },
     
+    // 儲存進度
     save: () => {
         localStorage.setItem('a330_career_state', JSON.stringify(Generator.state));
     },
     
+    // 重置生涯
     reset: (base) => {
         Generator.state = {
             base: base || "LSZH",
             location: base || "LSZH",
-            lastGate: null, 
+            lastGate: null,
             maintCounter: 0,
             totalHours: 0,
             lastFlightNum: null,
@@ -36,249 +42,216 @@ const Generator = {
         Generator.save();
     },
     
-    // --- 核心生成邏輯 ---
+    // --- 核心：生成整月班表 ---
     generateMonth: function() {
         let roster = {};
         let dayCounter = 1;
         
-        // [Fix] 初始生成：強制使用 LONG 類型來確保選到重型機位 (Dock E/B)
-        if (!Generator.state.lastGate) {
-            Generator.state.lastGate = Generator.assignGate(Generator.state.location, "LONG", [], "ARR");
-        }
+        // 如果是新開局，確保位置在基地
+        if (Generator.state.history.length === 0) Generator.state.location = Generator.state.base;
 
-        while(dayCounter <= 30) {
-            let flight = Generator.createDailyFlight(dayCounter);
-            if(flight) {
-                roster[flight.id] = flight;
-                
-                // 更新狀態
-                Generator.state.location = flight.dest;
-                Generator.state.lastGate = flight.arrGate; // 紀錄落地機位供下一腿使用
-                
-                Generator.state.totalHours += (flight.time / 60);
-                if (flight.tags.includes("MAINT")) Generator.state.maintCounter = 0; 
-                else Generator.state.maintCounter += (flight.time / 60);
-                
-                if(!flight.tags.includes("FERRY") && !flight.tags.includes("MAINT")) {
-                     Generator.state.lastFlightNum = parseInt(flight.id.replace("LX","")) || null;
+        let currentLocation = Generator.state.location;
+        let currentMaint = Generator.state.maintCounter;
+
+        while (dayCounter <= 30) {
+            // 1. 強制維修邏輯 (每 100 小時)
+            if (currentMaint >= 100) {
+                if (currentLocation !== "LSZH") {
+                    // 如果不在基地，必須飛回 LSZH
+                    let ferry = Generator.createMaintFlight(dayCounter, currentLocation, "LSZH");
+                    roster[`day_${dayCounter}`] = ferry;
+                    currentLocation = "LSZH";
+                } else {
+                    // 已在基地，進行維修 (地面停留)
+                    roster[`day_${dayCounter}`] = {
+                        day: dayCounter, type: "OFF", info: "🛠️ A-CHECK MAINTENANCE", location: "LSZH"
+                    };
+                    currentMaint = 0; // 重置維修計數
                 }
+                dayCounter++;
+                continue;
+            }
+
+            // 2. 隨機排休 (20% 機率)
+            if (Generator.rnd(1, 100) <= 20) {
+                roster[`day_${dayCounter}`] = {
+                    day: dayCounter, type: "OFF", info: "🏖️ OFF DAY", location: currentLocation
+                };
+                dayCounter++;
+                continue;
+            }
+
+            // 3. 生成航班
+            let flight = Generator.createFlight(dayCounter, currentLocation);
+            if (flight) {
+                roster[`day_${dayCounter}`] = flight;
+                currentLocation = flight.dest;
+                currentMaint += (flight.time / 60); // 累加飛行時數
+            } else {
+                // 找不到航班 (罕見)，強制休假
+                roster[`day_${dayCounter}`] = {
+                    day: dayCounter, type: "OFF", info: "⚠️ NO ROUTE AVAIL", location: currentLocation
+                };
             }
             dayCounter++;
         }
-        Generator.save();
+        
         return roster;
     },
-    
-    createDailyFlight: function(day) {
-        let s = Generator.state;
-        let db = window.routeDB;
-        let flightId = `Day ${String(day).padStart(2, '0')}`;
-        
-        // 1. 強制維修
-        if (s.maintCounter > 500) return Generator.createMaintFlight(flightId, s.location, s.base);
 
-        let candidates = db.regular.filter(r => r.route.startsWith(s.location));
+    // --- 輔助：建立單一航班 ---
+    createFlight: function(day, from) {
+        // 從 routeDB 尋找可用航線
+        let possibleRoutes = window.routeDB.regular.filter(r => r.route.startsWith(from + "-"));
         
-        // 2. 在外站
-        if (!["LSZH", "LSGG"].includes(s.location)) {
-            if (s.lastFlightNum) {
-                let targetNum = s.lastFlightNum % 2 === 0 ? s.lastFlightNum + 1 : s.lastFlightNum; 
-                let match = candidates.find(c => c.inbound.includes(targetNum));
-                if (match) return Generator.buildFlight(flightId, match, "INBOUND", targetNum);
+        // 如果沒有定期航班，嘗試生成包機或調機
+        if (possibleRoutes.length === 0) {
+            if (from !== "LSZH") {
+                return Generator.createFerryFlight(day, from, "LSZH"); // 回基地
             }
-            let randomReturn = candidates[Generator.rnd(0, candidates.length - 1)];
-            if(randomReturn) {
-                 let fNum = randomReturn.inbound[Generator.rnd(0, randomReturn.inbound.length-1)];
-                 return Generator.buildFlight(flightId, randomReturn, "INBOUND", fNum);
-            }
-            return Generator.createFerryFlight(flightId, s.location, s.base);
+            return null;
         }
 
-        // 3. 在基地 (LSZH/LSGG)
-        let dice = Generator.rnd(1, 100);
-        if (dice <= 5) {
-            let charterDest = db.charters[Generator.rnd(0, db.charters.length-1)];
-            return Generator.createCharterFlight(flightId, s.location, charterDest);
-        }
-
-        let potentialRoutes = db.regular.filter(r => r.route.startsWith(s.location));
-        if(potentialRoutes.length > 0) {
-            let selectedRoute = potentialRoutes[Generator.rnd(0, potentialRoutes.length-1)];
-            let fNum = selectedRoute.outbound[Generator.rnd(0, selectedRoute.outbound.length-1)];
-            let isPreighter = (selectedRoute.isCargoHotspot && Generator.rnd(1, 100) <= 15);
-            return Generator.buildFlight(flightId, selectedRoute, "OUTBOUND", fNum, isPreighter);
-        } else {
-            let targetHub = s.location === "LSZH" ? "LSGG" : "LSZH";
-            return Generator.createShuttleFlight(flightId, s.location, targetHub);
-        }
-    },
-    
-    // --- 航班物件建構器 (含機位分配) ---
-    buildFlight: function(id, routeData, dir, fNum, isPreighter) {
-        let dest = routeData.route.split('-')[1];
-        let origin = routeData.route.split('-')[0];
+        // 隨機選一條航線
+        let routeData = possibleRoutes[Generator.rnd(0, possibleRoutes.length - 1)];
+        let dest = routeData.route.split("-")[1];
         
-        let tags = [];
-        if (routeData.type === "SHUTTLE") tags.push("SHUTTLE");
-        else if (routeData.type === "LONG") tags.push("LONG");
-        else tags.push("SHORT");
-        if (isPreighter) tags.push("PREIGHTER"); else tags.push("PAX");
+        // 隨機選班號
+        let flightNum = "LX" + routeData.outbound[Generator.rnd(0, routeData.outbound.length - 1)];
+        
+        // 判斷是否為客改貨 (Preighter)
+        let isPreighter = (routeData.type === "LONG" && Generator.rnd(1, 100) <= 15); 
+        let tags = [routeData.type];
+        if (isPreighter) tags.push("PREIGHTER");
 
-        // 出發機位：連貫性優先
-        let depGate = (Generator.state.location === origin && Generator.state.lastGate) 
-                      ? Generator.state.lastGate 
-                      : Generator.assignGate(origin, routeData.type, tags, "DEP");
-                      
-        // 抵達機位：重新分配
-        let arrGate = Generator.assignGate(dest, routeData.type, tags, "ARR");
+        // 分配機位 (使用新的 GateDB)
+        let gate = Generator.assignGate(from, routeData.type, tags, "DEP");
 
         return {
-            day: id, id: "LX" + fNum, r: routeData.route,
-            dist: Math.round(routeData.time * 8), time: routeData.time,
-            type: isPreighter ? "CGO" : "PAX", profile: isPreighter ? "CARGO" : "BIZ",
-            dest: dest, tags: tags, d: `${tags.join(' | ')}`,
-            depGate: depGate, arrGate: arrGate
+            day: day,
+            id: flightNum,
+            r: routeData.route,
+            dist: 0, // 距離會在 flight_computer 計算時補上
+            time: routeData.time,
+            type: isPreighter ? "CGO" : "PAX",
+            profile: isPreighter ? "CARGO" : "BIZ",
+            dest: dest,
+            gate: gate,
+            tags: tags,
+            d: `${tags.join(' | ')}`
         };
     },
     
     createMaintFlight: function(id, from, to) {
         let num = "LX" + Generator.rnd(9000, 9999);
-        let tags = ["MAINT", "FERRY"];
-        let depGate = (Generator.state.lastGate) ? Generator.state.lastGate : "APRON";
-        let arrGate = Generator.assignGate(to, "SHORT", tags, "ARR");
-
+        let gate = Generator.assignGate(from, "FERRY", ["MAINT"], "DEP");
         return {
             day: id, id: num, r: `${from}-${to}`, dist: 0, time: 120,
-            type: "MAINT", profile: "FERRY", dest: to, tags: tags, d: "🛠️ MANDATORY MAINTENANCE",
-            depGate: depGate, arrGate: arrGate
+            type: "MAINT", profile: "FERRY", dest: to, gate: gate, tags: ["MAINT", "FERRY"], d: "🛠️ MAINT FERRY"
         };
     },
     
     createFerryFlight: function(id, from, to) {
         let num = "LX" + Generator.rnd(9000, 9999);
-        let tags = ["FERRY"];
-        let depGate = Generator.state.lastGate || "APRON";
-        let arrGate = Generator.assignGate(to, "SHORT", tags, "ARR");
-
+        let gate = Generator.assignGate(from, "FERRY", ["FERRY"], "DEP");
         return {
             day: id, id: num, r: `${from}-${to}`, dist: 0, time: 120,
-            type: "FERRY", profile: "FERRY", dest: to, tags: tags, d: "⚠️ POSITIONING FLIGHT",
-            depGate: depGate, arrGate: arrGate
-        };
-    },
-    
-    createShuttleFlight: function(id, from, to) {
-         let num = "LX" + Generator.rnd(2800, 2819);
-         let tags = ["SHUTTLE", "PAX"];
-         let depGate = Generator.state.lastGate || Generator.assignGate(from, "SHORT", tags, "DEP");
-         let arrGate = Generator.assignGate(to, "SHORT", tags, "ARR");
-
-         return {
-            day: id, id: num, r: `${from}-${to}`, dist: 125, time: 45,
-            type: "PAX", profile: "BIZ", dest: to, tags: tags, d: "🇨🇭 HUB SHUTTLE",
-            depGate: depGate, arrGate: arrGate
-        };
-    },
-    
-    createCharterFlight: function(id, from, destObj) {
-        let num = "LX" + Generator.rnd(8000, 8999);
-        let tags = ["CHARTER", "PAX", "LONG"];
-        let depGate = Generator.state.lastGate || Generator.assignGate(from, "LONG", tags, "DEP");
-        let arrGate = Generator.assignGate(destObj.dest, "LONG", tags, "ARR");
-
-        return {
-            day: id, id: num, r: `${from}-${destObj.dest}`, dist: Math.round(destObj.time * 8), time: destObj.time,
-            type: "PAX", profile: "LEISURE", dest: destObj.dest, tags: tags, d: `🏖️ CHARTER: ${destObj.name}`,
-            depGate: depGate, arrGate: arrGate
+            type: "FERRY", profile: "FERRY", dest: to, gate: gate, tags: ["FERRY"], d: "⚠️ POSITIONING"
         };
     },
 
     // =======================================================
-    // 🧠 智慧機位分配系統 (Smart Gate Logic v2)
+    // 🧠 智慧機位分配系統 (v4.0 - Read from gates.js)
     // =======================================================
     assignGate: function(icao, type, tags, mode) {
-        let ap = window.airportDB[icao];
-        if (!ap || !ap.gates) return "APRON";
+        // [關鍵修改] 改讀取獨立的 gateDB (gates.js)，而非 airportDB
+        // 如果找不到該機場的機位資料，直接回傳 APRON
+        let gateData = window.gateDB ? window.gateDB[icao] : null;
+        if (!gateData) return "APRON";
 
         let candidates = [];
         let allGates = [];
-        for (let grp in ap.gates) allGates = allGates.concat(ap.gates[grp]);
+        
+        // 收集該機場所有可用機位 (Flatten Object values)
+        for (let grp in gateData) allGates = allGates.concat(gateData[grp]);
 
         // -----------------------
-        // 1. 蘇黎世 (LSZH) - A330 專用邏輯
+        // 1. 蘇黎世 (LSZH) - 基地邏輯
         // -----------------------
         if (icao === "LSZH") {
-            // [Critical Fix] A330 絕對不能停 Dock A (太小)，只能停 Dock B, E 或 General
-            
-            // A. 維修/貨運
+            // 維修或客改貨 (Preighter)
             if (tags.includes("MAINT") || tags.includes("PREIGHTER")) {
                 let isCargoInCabin = (tags.includes("PREIGHTER") && Generator.rnd(1,100) <= 30);
                 if (isCargoInCabin) {
-                    if (ap.gates["Dock E"]) candidates = candidates.concat(ap.gates["Dock E"]);
-                    if (ap.gates["Dock B"]) candidates = candidates.concat(ap.gates["Dock B"]);
+                    // 有載貨的客機停航廈
+                    if (gateData["Dock E"]) candidates = candidates.concat(gateData["Dock E"]);
+                    if (gateData["Dock B"]) candidates = candidates.concat(gateData["Dock B"]);
                 } else {
-                    if (ap.gates["General"]) candidates = candidates.concat(ap.gates["General"]);
+                    // 純維修或過夜停遠端 (General)
+                    if (gateData["General"]) candidates = candidates.concat(gateData["General"]);
                 }
-            }
-            // B. 一般客運
-            else {
+            } else {
+                // 正常客運航班
                 if (type === "LONG") {
-                    // 長程首選 Dock E
-                    if (ap.gates["Dock E"]) candidates = candidates.concat(ap.gates["Dock E"]);
-                    
-                    // 如果運氣不好(20%)，或者 E 區沒資料，才選 Dock B
+                    // 長程線優先 Dock E (80%)，其次 Dock B (20%)
+                    if (gateData["Dock E"]) candidates = candidates.concat(gateData["Dock E"]);
                     if (candidates.length === 0 || Generator.rnd(1,100) <= 20) {
-                        if (ap.gates["Dock B"]) candidates = candidates.concat(ap.gates["Dock B"]);
+                        if (gateData["Dock B"]) candidates = candidates.concat(gateData["Dock B"]);
                     }
                 } else {
-                    // 短程/Shuttle (如 LHR, GVA) 首選 Dock B (因為是混用區)
-                    if (ap.gates["Dock B"]) candidates = candidates.concat(ap.gates["Dock B"]);
-                    
-                    // 備選 Dock E (有些非申根短程會去 E)
+                    // 短程線優先 Dock B (70%)，其次 Dock E (30%)
+                    if (gateData["Dock B"]) candidates = candidates.concat(gateData["Dock B"]);
                     if (candidates.length === 0 || Generator.rnd(1,100) <= 30) {
-                         if (ap.gates["Dock E"]) candidates = candidates.concat(ap.gates["Dock E"]);
+                         if (gateData["Dock E"]) candidates = candidates.concat(gateData["Dock E"]);
                     }
                 }
             }
         }
         
         // -----------------------
-        // 2. 日內瓦 (LSGG)
+        // 2. 日內瓦 (LSGG) - 樞紐邏輯
         // -----------------------
         else if (icao === "LSGG") {
             if (type === "LONG") {
-                if (ap.gates["East Wing"]) candidates = candidates.concat(ap.gates["East Wing"]);
-                if (ap.gates["Main Terminal"]) candidates = candidates.concat(ap.gates["Main Terminal"]);
+                if (gateData["East Wing"]) candidates = candidates.concat(gateData["East Wing"]);
+                if (gateData["Main Terminal"]) candidates = candidates.concat(gateData["Main Terminal"]);
             } else {
-                if (ap.gates["Main Terminal"]) candidates = candidates.concat(ap.gates["Main Terminal"]);
+                if (gateData["Main Terminal"]) candidates = candidates.concat(gateData["Main Terminal"]);
             }
         }
 
         // -----------------------
-        // 3. 外站通用
+        // 3. 通用外站 (Outstations)
         // -----------------------
         else {
-            let prefKeys = ["Terminal 1", "Terminal 2", "Concourse A", "Main"];
-            if (icao === "EGLL") prefKeys = ["Terminal 2"];
+            // 優先尋找符合星空聯盟或適合 A330 的關鍵字區域
+            let prefKeys = ["Terminal 1", "Terminal 2", "Concourse A", "Main", "Dock"];
+            
+            // 特殊機場偏好設定
+            if (icao === "EGLL") prefKeys = ["Terminal 2"]; // 希斯洛 T2 (星盟)
             if (icao === "KJFK") prefKeys = ["Terminal 1", "Terminal 4"];
-            if (icao === "EDDF") prefKeys = ["Concourse A", "Concourse B"];
-            if (icao === "EDDM") prefKeys = ["Terminal 2"];
+            if (icao === "EDDF") prefKeys = ["Concourse A", "Concourse B"]; // 法蘭克福 (漢莎)
+            if (icao === "EDDM") prefKeys = ["Terminal 2"]; // 慕尼黑 T2
             if (icao === "OMDB") prefKeys = ["Concourse D"]; 
 
-            for (let grp in ap.gates) {
+            // 在新的 gateData 中搜尋
+            for (let grp in gateData) {
                 for (let key of prefKeys) {
                     if (grp.includes(key)) {
-                        candidates = candidates.concat(ap.gates[grp]);
+                        candidates = candidates.concat(gateData[grp]);
                     }
                 }
             }
         }
 
+        // 如果上述規則都沒找到特定機位，就開放使用該機場所有機位
         if (candidates.length === 0) candidates = allGates;
+        
+        // 隨機抽選一個
         if (candidates.length > 0) {
             return candidates[Generator.rnd(0, candidates.length - 1)];
         }
         
-        return "APRON";
+        return "APRON"; // 真的都沒有就停坪
     }
 };
