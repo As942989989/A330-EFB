@@ -116,6 +116,10 @@ function renderRoster() {
         else if (v.tags.includes("SHUTTLE")) { badgeColor = "#95a5a6"; icon = "🚌"; }
         else if (v.tags.includes("CHARTER")) { badgeColor = "#f1c40f"; icon = "🏖️"; }
 
+        // [New] 處理機位顯示字串
+        let depGateDisp = v.depGate ? v.depGate : "--";
+        let arrGateDisp = v.arrGate ? v.arrGate : "--";
+
         const d = document.createElement('div');
         d.className = `flight-card ${completedFlights[k]?'completed':''}`;
         d.onclick = () => loadFlight(k); 
@@ -123,7 +127,12 @@ function renderRoster() {
             <div class="flight-info">
                 <div class="flight-day" style="color:${badgeColor}">${v.day} | ${v.id}</div>
                 <div class="flight-route">${v.r}</div>
-                <div style="font-size:11px; color:#aaa; margin-top:4px;">
+                
+                <div style="font-size:12px; color:#fff; font-family:monospace; margin-top:6px; background:#111; padding:4px; border-radius:4px; display:inline-block; border:1px solid #333;">
+                    🛫 GATE ${depGateDisp} &nbsp;➝&nbsp; 🛬 GATE ${arrGateDisp}
+                </div>
+
+                <div style="font-size:11px; color:#aaa; margin-top:6px;">
                     ${icon} ${v.d}
                 </div>
             </div>
