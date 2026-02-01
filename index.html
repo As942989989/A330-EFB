@@ -87,10 +87,13 @@
     </div>
 
     <div style="margin-top:15px;">
-        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-            <label style="width:auto; color:#e67e22;">CARGO (FWD/AFT)</label>
-            <span style="font-size:12px; font-weight:bold; color:#fff;"><span id="dsp-cgo-total">0</span> <span style="color:#666; font-size:10px;">KG</span></span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+            <label style="width:auto; color:#e67e22;">CARGO TOTAL (KG)</label>
+            <input type="number" id="dsp-cgo-total-input" 
+                   style="width:80px; text-align:right; font-weight:bold; color:#fff; border:none; border-bottom:1px solid #666; background:transparent; padding:2px;"
+                   oninput="updateCargoFromTotal()">
         </div>
+        
         <div class="bar-container" style="border:1px solid #555;">
             <div class="bar-split">
                 <div id="bar-cgo-fwd" class="bar-fwd" style="width:50%"></div>
