@@ -1,12 +1,12 @@
 // ==========================================
-// 📅 A330 Career System (Generator Logic v2)
+// 📅 A330 Career System (Generator Logic v3 - Fix E Gate)
 // ==========================================
 
 const Generator = {
     state: {
         base: "LSZH",           // 生涯基地
         location: "LSZH",       // 目前飛機位置
-        lastGate: null,         // [New] 上一腿的停機位 (確保連貫性)
+        lastGate: null,         // 上一腿的停機位 (確保連貫性)
         maintCounter: 0,        // 累積維修時數
         totalHours: 0,          // 生涯總時數
         lastFlightNum: null,    // 上一腿班號
@@ -41,9 +41,9 @@ const Generator = {
         let roster = {};
         let dayCounter = 1;
         
-        // 如果是全新生涯，先隨機給一個初始機位
+        // [Fix] 初始生成：強制使用 LONG 類型來確保選到重型機位 (Dock E/B)
         if (!Generator.state.lastGate) {
-            Generator.state.lastGate = Generator.assignGate(Generator.state.location, "PAX", [], "ARR");
+            Generator.state.lastGate = Generator.assignGate(Generator.state.location, "LONG", [], "ARR");
         }
 
         while(dayCounter <= 30) {
@@ -124,8 +124,7 @@ const Generator = {
         else tags.push("SHORT");
         if (isPreighter) tags.push("PREIGHTER"); else tags.push("PAX");
 
-        // [New] 機位分配邏輯
-        // 出發機位：如果是從目前所在地出發，強制使用上一腿的停機位 (連貫性)
+        // 出發機位：連貫性優先
         let depGate = (Generator.state.location === origin && Generator.state.lastGate) 
                       ? Generator.state.lastGate 
                       : Generator.assignGate(origin, routeData.type, tags, "DEP");
@@ -138,16 +137,15 @@ const Generator = {
             dist: Math.round(routeData.time * 8), time: routeData.time,
             type: isPreighter ? "CGO" : "PAX", profile: isPreighter ? "CARGO" : "BIZ",
             dest: dest, tags: tags, d: `${tags.join(' | ')}`,
-            depGate: depGate, arrGate: arrGate // 儲存機位
+            depGate: depGate, arrGate: arrGate
         };
     },
     
-    // --- 特殊航班生成 ---
     createMaintFlight: function(id, from, to) {
         let num = "LX" + Generator.rnd(9000, 9999);
         let tags = ["MAINT", "FERRY"];
         let depGate = (Generator.state.lastGate) ? Generator.state.lastGate : "APRON";
-        let arrGate = Generator.assignGate(to, "SHORT", tags, "ARR"); // 維修通常去 General/Apron
+        let arrGate = Generator.assignGate(to, "SHORT", tags, "ARR");
 
         return {
             day: id, id: num, r: `${from}-${to}`, dist: 0, time: 120,
@@ -196,52 +194,56 @@ const Generator = {
     },
 
     // =======================================================
-    // 🧠 智慧機位分配系統 (Smart Gate Logic)
+    // 🧠 智慧機位分配系統 (Smart Gate Logic v2)
     // =======================================================
     assignGate: function(icao, type, tags, mode) {
         let ap = window.airportDB[icao];
-        if (!ap || !ap.gates) return "APRON"; // 無資料時的回退
+        if (!ap || !ap.gates) return "APRON";
 
         let candidates = [];
         let allGates = [];
-        
-        // 收集所有機位以備不時之需
         for (let grp in ap.gates) allGates = allGates.concat(ap.gates[grp]);
 
         // -----------------------
-        // 1. 蘇黎世 (LSZH) 邏輯
+        // 1. 蘇黎世 (LSZH) - A330 專用邏輯
         // -----------------------
         if (icao === "LSZH") {
-            // A. 維修/貨運 (高機率去遠端，低機率去客運)
+            // [Critical Fix] A330 絕對不能停 Dock A (太小)，只能停 Dock B, E 或 General
+            
+            // A. 維修/貨運
             if (tags.includes("MAINT") || tags.includes("PREIGHTER")) {
-                let isCargoInCabin = (tags.includes("PREIGHTER") && Generator.rnd(1,100) <= 30); // 30% 機率停客運航廈
-                
+                let isCargoInCabin = (tags.includes("PREIGHTER") && Generator.rnd(1,100) <= 30);
                 if (isCargoInCabin) {
-                    // 停 Dock B 或 E
-                    if (ap.gates["Dock B"]) candidates = candidates.concat(ap.gates["Dock B"]);
                     if (ap.gates["Dock E"]) candidates = candidates.concat(ap.gates["Dock E"]);
+                    if (ap.gates["Dock B"]) candidates = candidates.concat(ap.gates["Dock B"]);
                 } else {
-                    // 停 General
                     if (ap.gates["General"]) candidates = candidates.concat(ap.gates["General"]);
                 }
             }
-            // B. 長程/非申根 -> Dock E (首選) > Dock B
-            else if (type === "LONG") {
-                if (ap.gates["Dock E"]) candidates = candidates.concat(ap.gates["Dock E"]);
-                // 如果 Dock E 滿了(或是隨機)，備選 Dock B
-                if (candidates.length === 0 || Generator.rnd(1,100) < 20) {
-                    if (ap.gates["Dock B"]) candidates = candidates.concat(ap.gates["Dock B"]);
-                }
-            }
-            // C. 短程/申根 -> Dock A > Dock B
+            // B. 一般客運
             else {
-                if (ap.gates["Dock A"]) candidates = candidates.concat(ap.gates["Dock A"]);
-                if (ap.gates["Dock B"]) candidates = candidates.concat(ap.gates["Dock B"]);
+                if (type === "LONG") {
+                    // 長程首選 Dock E
+                    if (ap.gates["Dock E"]) candidates = candidates.concat(ap.gates["Dock E"]);
+                    
+                    // 如果運氣不好(20%)，或者 E 區沒資料，才選 Dock B
+                    if (candidates.length === 0 || Generator.rnd(1,100) <= 20) {
+                        if (ap.gates["Dock B"]) candidates = candidates.concat(ap.gates["Dock B"]);
+                    }
+                } else {
+                    // 短程/Shuttle (如 LHR, GVA) 首選 Dock B (因為是混用區)
+                    if (ap.gates["Dock B"]) candidates = candidates.concat(ap.gates["Dock B"]);
+                    
+                    // 備選 Dock E (有些非申根短程會去 E)
+                    if (candidates.length === 0 || Generator.rnd(1,100) <= 30) {
+                         if (ap.gates["Dock E"]) candidates = candidates.concat(ap.gates["Dock E"]);
+                    }
+                }
             }
         }
         
         // -----------------------
-        // 2. 日內瓦 (LSGG) 邏輯
+        // 2. 日內瓦 (LSGG)
         // -----------------------
         else if (icao === "LSGG") {
             if (type === "LONG") {
@@ -253,20 +255,16 @@ const Generator = {
         }
 
         // -----------------------
-        // 3. 通用外站 (Outstations)
+        // 3. 外站通用
         // -----------------------
         else {
-            // 嘗試尋找關鍵字 (Star Alliance 常用航廈)
             let prefKeys = ["Terminal 1", "Terminal 2", "Concourse A", "Main"];
-            
-            // 特例處理 (星盟樞紐)
-            if (icao === "EGLL") prefKeys = ["Terminal 2"]; // 希斯洛 T2
+            if (icao === "EGLL") prefKeys = ["Terminal 2"];
             if (icao === "KJFK") prefKeys = ["Terminal 1", "Terminal 4"];
-            if (icao === "EDDF") prefKeys = ["Concourse A", "Concourse B"]; // 漢莎樞紐
-            if (icao === "EDDM") prefKeys = ["Terminal 2"]; // 慕尼黑 T2
+            if (icao === "EDDF") prefKeys = ["Concourse A", "Concourse B"];
+            if (icao === "EDDM") prefKeys = ["Terminal 2"];
             if (icao === "OMDB") prefKeys = ["Concourse D"]; 
 
-            // 搜尋匹配的群組
             for (let grp in ap.gates) {
                 for (let key of prefKeys) {
                     if (grp.includes(key)) {
@@ -276,10 +274,7 @@ const Generator = {
             }
         }
 
-        // 如果上述規則都沒找到機位，就用所有機位
         if (candidates.length === 0) candidates = allGates;
-        
-        // 從候選名單中隨機選一個
         if (candidates.length > 0) {
             return candidates[Generator.rnd(0, candidates.length - 1)];
         }
