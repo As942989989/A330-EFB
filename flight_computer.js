@@ -1,8 +1,9 @@
 // ==========================================
-// 🧠 A330 Flight Computer v4.9 (Updated with 10k Limit)
+// 🧠 A330 Flight Computer (Lite Version)
+// 包含: Dispatch 生成器 & 簡易 N1/Trim 計算器
 // ==========================================
 
-// --- Dispatch State & Logic ---
+// --- 1. Dispatch Logic (保留 DSP 計算功能) ---
 let currentDispatchState = {
     flightId: null, dist: 0, ci: 0, pax: 0, cgoF: 0, cgoA: 0, fuel: 0, warnings: [], isSaved: false
 };
@@ -36,12 +37,11 @@ function generateNewDispatch(flightId) {
     currentDispatchState.isSaved = false;
     let tags = f.tags || [];
 
-    // --- 1. Passenger Logic (Max 441) ---
+    // Pax Generation
     let basePax = 441;
     let lf = rnd(70, 95) / 100;
     if (tags.includes("PREIGHTER")) {
         currentDispatchState.pax = rnd(280, 310); 
-        currentDispatchState.warnings.push("📦 PREIGHTER MODE ACTIVE");
     } else if (tags.includes("FERRY") || tags.includes("MAINT")) {
         currentDispatchState.pax = 0;
     } else {
@@ -49,35 +49,27 @@ function generateNewDispatch(flightId) {
         currentDispatchState.pax = Math.floor(basePax * lf);
     }
 
-    // --- 2. Cargo Logic (Total Calculation) ---
+    // Cargo Generation
     let paxWt = currentDispatchState.pax * 77;
     let oew = 129855;
-    let roomForCargo = 175000 - (oew + paxWt); // MZFW Limit
+    let roomForCargo = 175000 - (oew + paxWt);
     let cgoTarget = 0;
 
     if (tags.includes("PREIGHTER")) {
         cgoTarget = Math.min(roomForCargo - 500, 40000);
-    } else if (!tags.includes("FERRY") && !tags.includes("MAINT")) {
+    } else if (!tags.includes("FERRY")) {
         let cargoSpace = Math.min(roomForCargo, 20000);
         cgoTarget = Math.floor(cargoSpace * (rnd(40, 90)/100));
     }
-    currentDispatchState.cgoTotal = Math.max(0, Math.floor(cgoTarget));
-
-    // --- 3. Split Cargo (🟢 MODIFIED: 10,000kg Limit applied here) ---
-    let fwdRatio = tags.includes("PREIGHTER") ? 0.52 : 0.55;
-
-    // 原始分配計算
-    let rawFwd = Math.floor(currentDispatchState.cgoTotal * fwdRatio);
-    let rawAft = currentDispatchState.cgoTotal - rawFwd;
-
-    // 強制限制：單一貨艙不得超過 10,000 kg
+    
+    // Split Cargo
+    let totalCgo = Math.max(0, Math.floor(cgoTarget));
+    let rawFwd = Math.floor(totalCgo * 0.55);
     currentDispatchState.cgoF = Math.min(rawFwd, 10000);
-    currentDispatchState.cgoA = Math.min(rawAft, 10000);
-
-    // 重新計算總重 (因為超出 10k 的部分被切除了)
+    currentDispatchState.cgoA = Math.min(totalCgo - rawFwd, 10000);
     currentDispatchState.cgoTotal = currentDispatchState.cgoF + currentDispatchState.cgoA;
 
-    // --- 4. Fuel Logic ---
+    // Fuel Generation
     currentDispatchState.ci = tags.includes("SHUTTLE") ? 80 : rnd(20, 60);
     let tripFuel = (f.dist * 12.5) + (currentDispatchState.cgoTotal/1000 * 0.04 * f.dist);
     currentDispatchState.fuel = Math.round(tripFuel + 5500); 
@@ -97,7 +89,7 @@ function updateDispatchDisplay() {
     document.getElementById('dsp-dist-disp').innerText = s.dist + " NM";
     document.getElementById('dsp-pax-count').innerText = s.pax;
     
-    let paxWt = s.pax * (window.weightDB ? window.weightDB.pax_unit : 77);
+    let paxWt = s.pax * 77;
     document.getElementById('dsp-pax-total-wt').innerText = paxWt;
     document.getElementById('bar-pax').style.width = Math.min(100, (s.pax / 441) * 100) + "%";
 
@@ -113,8 +105,9 @@ function updateDispatchDisplay() {
     document.getElementById('dsp-cgo-aft-pct').innerText = Math.round(100 - fwdPct) + "%";
 
     document.getElementById('dsp-est-fuel').innerText = s.fuel;
-
-    let oew = window.weightDB ? window.weightDB.oew : 129855;
+    
+    // DSP Page Totals
+    let oew = 129855;
     let zfw = oew + paxWt + cgoTotal;
     let tow = zfw + s.fuel;
     let lw = tow - Math.max(0, s.fuel - 5500);
@@ -122,231 +115,149 @@ function updateDispatchDisplay() {
     document.getElementById('dsp-res-zfw').innerText = Math.round(zfw/1000) + "T";
     document.getElementById('dsp-res-tow').innerText = Math.round(tow/1000) + "T";
     document.getElementById('dsp-res-lw').innerText = Math.round(lw/1000) + "T";
-
-    let mtow = window.weightDB ? window.weightDB.limits.mtow : 242000;
-    let underload = mtow - tow;
+    
     let ulEl = document.getElementById('dsp-underload');
+    let underload = 242000 - tow;
     ulEl.innerText = underload;
     ulEl.style.color = underload >= 0 ? "#fff" : "#e74c3c";
-    
-    let statusEl = document.getElementById('dsp-rwy-status');
-    if(s.warnings.length > 0) {
-        statusEl.innerText = s.warnings[0]; statusEl.style.color = "#f1c40f";
-    } else {
-        statusEl.innerText = "STD OPS"; statusEl.style.color = "#2ecc71";
-    }
 }
 
+// 🟢 關鍵功能：將 DSP 數據傳輸到 Takeoff 頁面
 function confirmDispatch() {
     let s = currentDispatchState;
-    if(document.getElementById('pax-count')) document.getElementById('pax-count').value = s.pax;
-    if(document.getElementById('cargo-fwd')) document.getElementById('cargo-fwd').value = s.cgoF;
-    if(document.getElementById('cargo-aft')) document.getElementById('cargo-aft').value = s.cgoA;
-    if(document.getElementById('fuel-total')) document.getElementById('fuel-total').value = s.fuel;
     
-    // Auto estimate Trip Fuel
-    let estTrip = Math.max(0, s.fuel - 5500);
-    if(document.getElementById('trip-fuel')) document.getElementById('trip-fuel').value = estTrip;
+    // 1. 將 Pax 填入
+    let paxInput = document.getElementById('pax-count');
+    if(paxInput) paxInput.value = s.pax;
 
-    if(typeof updatePaxWeight === 'function') updatePaxWeight();
-    if(typeof updateTotalCargo === 'function') updateTotalCargo();
+    // 2. 將貨物填入
+    let fwdInput = document.getElementById('cargo-fwd');
+    let aftInput = document.getElementById('cargo-aft');
+    if(fwdInput) fwdInput.value = s.cgoF;
+    if(aftInput) aftInput.value = s.cgoA;
+
+    // 3. 將總油量填入
+    let fuelInput = document.getElementById('fuel-total');
+    if(fuelInput) fuelInput.value = s.fuel;
+    
+    // 4. 自動估算 Trip Fuel (總油量 - 5.5噸 備用油)
+    let tripInput = document.getElementById('trip-fuel');
+    if(tripInput) {
+        let estTrip = Math.max(0, s.fuel - 5500);
+        tripInput.value = estTrip;
+    }
+
+    // 5. 觸發一次更新，確保隱藏的 Total Weight 欄位同步
+    updatePaxWeight();
+    updateTotalCargo();
+    
+    // 6. 存檔並切換頁面
     if(typeof saveInputs === 'function') saveInputs();
-
     switchTab('takeoff');
-    alert("✅ LOAD SHEET ACCEPTED");
+    alert("✅ LOAD SHEET ACCEPTED & TRANSFERRED");
 }
 
-// --- Performance Calculations ---
+// ==========================================
+// 🚀 Simplified Performance Logic (N1 & Trim)
+// ==========================================
 
 function computeInternalZFWCG() {
+    // 基礎重心與力矩計算
     const BASE_CG = 24.0;
     let paxWt = parseFloat(document.getElementById('pax-weight').value) || 0;
     let fwdWt = parseFloat(document.getElementById('cargo-fwd').value) || 0;
     let aftWt = parseFloat(document.getElementById('cargo-aft').value) || 0;
+    
+    // 簡易力矩公式
     let cg = BASE_CG + (paxWt * 0.00020) + (fwdWt * -0.00050) + (aftWt * 0.00070);
     return Math.max(18, Math.min(42, cg));
 }
 
-function calculateTakeoff() {
-    ensureWeights(); // 🟢 強制更新重量，防止隱藏欄位為空
-    if(!window.perfDB || !window.weightDB) return;
-    
+function calculatePerformance() {
+    // 1. 確保隱藏欄位數據最新
+    updatePaxWeight();
+    updateTotalCargo();
+
+    // 2. 獲取 N1 輸入
     let oat = parseFloat(document.getElementById('to-oat').value);
-    if(isNaN(oat)) { alert("⚠️ Please Enter OAT"); return; }
+    let flex = parseFloat(document.getElementById('to-flex').value);
     
-    let rwyLen = parseFloat(document.getElementById('to-rwy-len').value)||10000;
-    let slope = parseFloat(document.getElementById('to-rwy-slope').value) || 0;
-    let isWet = document.getElementById('to-rwy-cond').value === 'WET';
-    let elev = parseFloat(document.getElementById('to-elev-disp').innerText)||0;
-
-    let oew = window.weightDB.oew;
-    let pax = parseFloat(document.getElementById('pax-weight').value)||0; // 讀取隱藏欄位
-    let cgo = parseFloat(document.getElementById('cargo-total').value)||0; // 讀取隱藏欄位
-    let fuel = parseFloat(document.getElementById('fuel-total').value)||0;
-    let tow = oew + pax + cgo + fuel;
-    
-    // Performance Loop
-    function computePerformance(tryFlex, tryConf) {
-        let isToga = (tryFlex === "TOGA");
-        let tempForCalc = isToga ? oat : tryFlex;
-        let fd = window.perfDB.flex_data;
-        let flexDelta = isToga ? 0 : (tempForCalc - fd.base_temp); 
+    // N1 計算邏輯 (GE CF6 簡易模型)
+    let n1Display = "--%";
+    if (!isNaN(oat) && !isNaN(flex)) {
+        let baseN1 = 98.2; // TOGA N1
+        let correction = 0.22; // 每度 Flex 減少的 N1
         
-        if (!isToga && tempForCalc < oat) return { valid: false };
-
-        let thrustPenaltyFactor = 1.0;
-        if (!isToga && flexDelta > 0) thrustPenaltyFactor += (flexDelta * fd.flex_dist_penalty);
-
-        let spd = interpolate(tow, window.perfDB.takeoff_speeds);
-        let corr = window.perfDB.conf_correction[tryConf];
-        let v1 = spd.v1 + corr.v1;
-        let vr = spd.vr + corr.vr;
-        let v2 = spd.v2 + corr.v2;
-
-        if (slope < 0) v1 -= (Math.abs(slope) * window.perfDB.runway_physics.slope_v1_factor);
-        if (isWet) v1 -= 8;
-        if (v1 < 112) v1 = 112; 
-        if (v1 > vr) v1 = vr;
-
-        let baseTOD = window.perfDB.dist_physics.base_to_dist_ft * Math.pow((tow / 200000), 2); 
-        baseTOD *= thrustPenaltyFactor * corr.dist_factor;
-        
-        if (slope > 0) baseTOD *= (1 + (slope * window.perfDB.runway_physics.slope_dist_factor));
-        if (slope < 0) baseTOD *= (1 + (slope * window.perfDB.runway_physics.slope_dist_factor * 0.5));
-        baseTOD *= (1 + (elev/1000 * 0.05)); 
-        if (isWet) baseTOD *= 1.1;
-
-        let margin = rwyLen - baseTOD;
-        return { valid: margin > 0, margin: margin, tod: Math.round(baseTOD), v1: Math.round(v1), vr: Math.round(vr), v2: Math.round(v2), flex: tryFlex, conf: tryConf };
-    }
-
-    let configsToTry = ["1+F", "2", "3"];
-    let bestResult = null;
-    let maxFlex = window.perfDB.flex_data.max_temp;
-
-    loop_outer:
-    for (let conf of configsToTry) {
-        for (let t = maxFlex; t >= oat; t--) {
-            let res = computePerformance(t, conf);
-            if (res.valid) { bestResult = res; break loop_outer; }
+        let tempDiff = flex - oat;
+        if (tempDiff < 0) {
+            alert("⚠️ Flex Temp cannot be lower than OAT");
+            n1Display = "ERR";
+        } else {
+            let n1 = baseN1 - (tempDiff * correction) - 0.8; // -0.8 for Packs ON
+            n1Display = n1.toFixed(1) + "%";
         }
-        let togaRes = computePerformance("TOGA", conf);
-        if (togaRes.valid) { bestResult = togaRes; break loop_outer; }
+    } else {
+        // 如果沒輸入溫度，只提示但不報錯，讓用戶可以只算 Trim
+        n1Display = "--%";
     }
+    document.getElementById('res-n1').innerText = n1Display;
 
-    if (!bestResult) {
-        alert("⚠️ PERFORMANCE LIMIT EXCEEDED");
-        document.getElementById('res-tow').innerText = "LIMIT EXCEEDED"; document.getElementById('res-tow').style.color = "red";
-        return;
-    }
+    // 3. 獲取重量與燃油輸入 (支持手動修改後的值)
+    let oew = 129855;
+    let pax = parseFloat(document.getElementById('pax-weight').value)||0;
+    let cgo = parseFloat(document.getElementById('cargo-total').value)||0;
+    let fuelBlock = parseFloat(document.getElementById('fuel-total').value)||0;
+    let fuelTrip = parseFloat(document.getElementById('trip-fuel').value)||0;
 
-    // Output
-    let n1 = window.perfDB.n1_physics.base_n1;
-    if (bestResult.flex !== "TOGA") n1 -= ((bestResult.flex - oat) * window.perfDB.n1_physics.flex_correction);
-    n1 -= window.perfDB.bleed_penalty.packs_on;
+    let zfw = oew + pax + cgo;
+    let tow = zfw + fuelBlock;
+    let lw = tow - fuelTrip; // Landing Weight = TOW - Trip Fuel
 
+    // 4. 配平計算 (Trim Calculations)
     let zfwCG = computeInternalZFWCG();
-    let fuelEffect = fuel * window.perfDB.trim_physics.fuel_cg_effect;
-    let towCG = Math.min(42, zfwCG + fuelEffect);
-    let ths = calculateTHS(towCG);
-
-    document.getElementById('res-tow').innerText = Math.round(tow) + " KG";
-    document.getElementById('res-tow').style.color = (tow > window.weightDB.limits.mtow) ? "#e74c3c" : "#fff";
-    document.getElementById('res-conf').innerText = bestResult.conf;
-    document.getElementById('res-flex').innerText = (bestResult.flex === "TOGA") ? "TOGA" : bestResult.flex + "°";
-    document.getElementById('res-n1').innerText = n1.toFixed(1) + "%";
-    document.getElementById('res-trim').innerText = `${ths.text} (${convertToIF(ths.raw)}%)`;
-    document.getElementById('res-tow-cg-display').innerText = towCG.toFixed(1) + "%";
     
-    document.getElementById('res-v1').innerText = bestResult.v1;
-    document.getElementById('res-vr').innerText = bestResult.vr;
-    document.getElementById('res-v2').innerText = bestResult.v2;
-    document.getElementById('res-to-dist').innerText = bestResult.tod + " FT";
-    document.getElementById('res-green-dot').innerText = Math.round(0.6 * (tow/1000) + 135) + " KT";
+    // Fuel CG Effect (油量對重心的影響係數)
+    const FUEL_CG_FACTOR = 0.00004; 
 
-    let marginEl = document.getElementById('res-stop-margin');
-    if (marginEl) {
-        marginEl.innerText = (bestResult.margin >= 0 ? "+" : "") + Math.round(bestResult.margin) + " FT";
-        marginEl.style.color = (bestResult.margin < 800) ? "orange" : "#2ecc71";
-    }
+    // A. 起飛配平 (TOW Trim)
+    let towCG = zfwCG + (fuelBlock * FUEL_CG_FACTOR);
+    towCG = Math.max(18, Math.min(42, towCG)); // 限制範圍
+    let toThs = calculateTHS(towCG);
 
-    // Auto Transfer to Landing
-    let trip = parseFloat(document.getElementById('trip-fuel').value)||0;
-    document.getElementById('ldg-gw-input').value = Math.round(tow - trip);
+    // B. 降落配平 (Landing Trim)
+    // 落地時油量 = 起飛油量 - 航程耗油
+    let fuelAtLanding = Math.max(0, fuelBlock - fuelTrip);
+    let ldgCG = zfwCG + (fuelAtLanding * FUEL_CG_FACTOR);
+    ldgCG = Math.max(18, Math.min(42, ldgCG)); // 限制範圍
+    let ldgThs = calculateTHS(ldgCG);
+
+    // 5. 更新 UI
+    document.getElementById('res-zfw-disp').innerText = Math.round(zfw);
+    
+    // Update Takeoff Results
+    document.getElementById('res-to-trim').innerText = `${toThs.text}`;
+    document.getElementById('res-tow-disp').innerText = `TOW: ${Math.round(tow)} KG`;
+
+    // Update Landing Results
+    document.getElementById('res-ldg-trim').innerText = `${ldgThs.text}`;
+    document.getElementById('res-lw-disp').innerText = `EST LW: ${Math.round(lw)} KG`;
+
+    // 儲存輸入以便下次使用
     if(typeof saveInputs === 'function') saveInputs();
 }
 
-function calculateLanding() {
-    if(!window.perfDB || !window.weightDB) return;
-    let ldw = parseFloat(document.getElementById('ldg-gw-input').value) || 0;
-    let rwyLen = parseFloat(document.getElementById('ldg-rwy-len').value)||10000;
-    let slope = parseFloat(document.getElementById('ldg-rwy-slope').value) || 0;
-    let isWet = document.getElementById('ldg-rwy-cond').value === 'WET';
-    let revMode = document.getElementById('ldg-rev').value;
-    let wdir = parseFloat(document.getElementById('ldg-wind-dir').value)||0;
-    let wspd = parseFloat(document.getElementById('ldg-wind-spd').value)||0;
-    let rhdg = parseFloat(document.getElementById('ldg-rwy-hdg').value)||0;
-    
-    let hw = Math.cos(Math.abs(rhdg - wdir) * (Math.PI / 180)) * wspd;
-
-    let scenarios = [{ conf: 'FULL', ab: 'MAX' }, { conf: 'FULL', ab: 'MED' }, { conf: 'FULL', ab: 'LO' }, { conf: '3', ab: 'MED' }];
-    let matrixResults = [];
-
-    scenarios.forEach(sc => {
-        let vls = interpolateVLS(ldw, window.perfDB.landing_vls_full);
-        if (sc.conf === '3') vls += window.perfDB.landing_conf3_add;
-        let vapp = Math.round(vls + Math.max(5, Math.min(15, hw / 3)));
-
-        let dist = window.perfDB.dist_physics.base_ld_dist_ft * (ldw / 180000); 
-        dist *= window.perfDB.decel_physics.autobrake[sc.ab]; 
-        if (sc.conf === '3') dist *= window.perfDB.decel_physics.conf3_penalty; 
-        if (slope < 0) dist *= (1 + (Math.abs(slope) * 0.10)); 
-        
-        let revFactor = isWet ? window.perfDB.decel_physics.rev_credit.wet : window.perfDB.decel_physics.rev_credit.dry;
-        if (revMode === 'max') dist *= (1 - revFactor);
-        
-        let safety = isWet ? window.perfDB.decel_physics.safety_margin.wet : window.perfDB.decel_physics.safety_margin.dry;
-        let rld = Math.round(dist * safety);
-        let margin = rwyLen - rld;
-
-        matrixResults.push({ conf: sc.conf, ab: sc.ab, vapp: vapp, dist: rld, status: (margin >= 0) ? "GO" : "NO", color: (margin >= 0) ? "#00ff00" : "#e74c3c" });
-    });
-
-    let zfwCG = computeInternalZFWCG();
-    let ldgCG = zfwCG - 0.5;
-    let ldgTHS = calculateTHS(ldgCG);
-
-    document.getElementById('res-ldw').innerText = Math.round(ldw) + " KG";
-    document.getElementById('res-ldw').style.color = (ldw > window.weightDB.limits.mlw) ? "#e74c3c" : "#fff";
-
-    let tableHTML = `<table class="matrix-table"><thead><tr><th>CONF</th><th>BRK</th><th>VAPP</th><th>DIST</th><th></th></tr></thead><tbody>`;
-    matrixResults.forEach(r => {
-        tableHTML += `<tr><td style="color:${r.conf==='3'?'#ffcc00':'#fff'}">${r.conf}</td><td>${r.ab}</td><td style="color:#00bfff">${r.vapp}</td><td>${r.dist}</td><td style="font-weight:bold; color:${r.color}">${r.status}</td></tr>`;
-    });
-    tableHTML += `</tbody></table>`;
-
-    let perfSection = document.querySelector('#tab-landing .perf-section');
-    perfSection.innerHTML = `<div class="perf-title" style="color:#ffcc00;">LANDING DISTANCE MATRIX (RLD)</div>${tableHTML}<div style="border-bottom:1px solid #333;margin:8px 0;"></div><div class="data-grid" style="grid-template-columns: 1fr 1fr;"><div class="data-item"><div>TRIM (THS)</div><div id="res-ldg-trim">${ldgTHS.text} (${Math.min(100, convertToIF(ldgTHS.raw) + 5)}%)</div></div><div class="data-item"><div>LDG CG</div><div id="res-ldg-cg-display">${ldgCG.toFixed(1)}%</div></div></div>`;
-
-    if(typeof saveInputs === 'function') saveInputs();
-}
-
-// 🟢 Helper Functions for Weights (HTML oninput calls)
+// 輔助功能: 更新乘客重量 (DOM Event Listener)
 function updatePaxWeight() {
     let countEl = document.getElementById('pax-count');
     if(!countEl) return;
-    
     let count = parseFloat(countEl.value) || 0;
-    let unit = (window.weightDB && window.weightDB.pax_unit) ? window.weightDB.pax_unit : 77;
-    let total = count * unit;
-
-    let dispEl = document.getElementById('pax-weight-disp');
-    if(dispEl) dispEl.innerText = total;
-
+    let total = count * 77;
+    
     let hiddenEl = document.getElementById('pax-weight');
     if(hiddenEl) hiddenEl.value = total;
 }
 
+// 輔助功能: 更新貨物總重 (DOM Event Listener)
 function updateTotalCargo() {
     let fwd = parseFloat(document.getElementById('cargo-fwd').value) || 0;
     let aft = parseFloat(document.getElementById('cargo-aft').value) || 0;
@@ -354,9 +265,4 @@ function updateTotalCargo() {
 
     let hiddenEl = document.getElementById('cargo-total');
     if(hiddenEl) hiddenEl.value = total;
-}
-
-function ensureWeights() {
-    updatePaxWeight();
-    updateTotalCargo();
 }
