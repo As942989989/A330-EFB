@@ -234,12 +234,12 @@ function calculatePerformance() {
     // 5. 更新 UI
     document.getElementById('res-zfw-disp').innerText = Math.round(zfw);
     
-    // Update Takeoff Results
-    document.getElementById('res-to-trim').innerText = `${toThs.text}`;
+    // Update Takeoff Results (顯示 Infinite Flight %)
+    document.getElementById('res-to-trim').innerText = `${convertToIF(toThs.raw)}%`;
     document.getElementById('res-tow-disp').innerText = `TOW: ${Math.round(tow)} KG`;
 
-    // Update Landing Results
-    document.getElementById('res-ldg-trim').innerText = `${ldgThs.text}`;
+    // Update Landing Results (顯示 Infinite Flight %)
+    document.getElementById('res-ldg-trim').innerText = `${convertToIF(ldgThs.raw)}%`;
     document.getElementById('res-lw-disp').innerText = `EST LW: ${Math.round(lw)} KG`;
 
     // 儲存輸入以便下次使用
