@@ -474,3 +474,44 @@ input[type=range]::-webkit-slider-runnable-track {
     border: none;
 }
 
+/* ==========================================
+   [New] Gate Assignment Styles
+   ========================================== */
+
+.route-point {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px; /* 機場代碼與機位號碼的間距 */
+}
+
+.route-arrow {
+    color: #666;
+    margin: 0 8px;
+    font-size: 12px;
+}
+
+.gate-tag {
+    font-family: monospace;
+    font-size: 11px;
+    background-color: #333;
+    color: #00bfff; /* 亮藍色，類似 EFB 資訊 */
+    padding: 1px 4px;
+    border-radius: 3px;
+    border: 1px solid #444;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+}
+
+/* 針對 TBD (資料缺失) 的樣式 - 比較低調 */
+.gate-tag.tbd {
+    color: #666;
+    border-color: #333;
+    background-color: transparent;
+}
+
+/* 在已完成的航班卡片中，讓機位顏色變暗 */
+.flight-card.completed .gate-tag {
+    color: #555;
+    border-color: #2a2a2a;
+    background-color: transparent;
+}
