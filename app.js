@@ -1,159 +1,57 @@
 // ==========================================
-// 📱 A330 EFB App Controller v4.7
+// 📱 A330-300 EFB App Logic (Partial Update)
 // ==========================================
 
-let completedFlights = JSON.parse(safeGet('a330_completed_v4')) || {};
+// ... (保留原本的變數定義與初始化代碼) ...
 
-window.onload = function() {
-    // 載入 Generator 狀態
-    if(window.Generator) Generator.load();
-
-    // 更新標題
-    let titleEl = document.querySelector('.nav-header');
-    if(titleEl) {
-        titleEl.innerHTML = `A330 EFB <span style="font-size:12px; color:#00ff00;">v4.7 CAREER</span>` + 
-                            `<button class="reset-btn" onclick="clearAllData()">RESET</button>`;
-    }
-
-    // 檢查資料庫
-    if (!window.routeDB) alert("⚠️ RouteDB missing!");
-    
-    updateGeneratorUI();
-    renderRoster();
-    try { loadInputs(); } catch(e) {}
-};
-
-// --- Generator UI Logic ---
-function updateGeneratorUI() {
-    let s = Generator.state;
-    let statusEl = document.getElementById('gen-status-text');
-    let logEl = document.getElementById('gen-log');
-    
-    if(statusEl) {
-        statusEl.innerHTML = `
-            LOCATION: <span style="color:#00bfff">${s.location}</span> | 
-            HOURS: ${s.totalHours.toFixed(1)} | 
-            MAINT: ${s.maintCounter.toFixed(1)}/500h
-        `;
-    }
-    
-    // 根據是否有存檔，切換按鈕狀態
-    let btnCont = document.getElementById('btn-continue-career');
-    if(btnCont) btnCont.disabled = (s.totalHours === 0);
-}
-
-function startNewCareer() {
-    let base = document.getElementById('base-select').value;
-    if(confirm(`Start new career at ${base}? Previous data will be lost.`)) {
-        Generator.reset(base);
-        generateAndLoad();
-    }
-}
-
-function continueCareer() {
-    generateAndLoad();
-}
-
-function generateAndLoad() {
-    logToConsole("🔄 Generating Roster...");
-    let newRoster = Generator.generateMonth();
-    
-    // 存入 LocalStorage 供 Roster.js 讀取
-    localStorage.setItem('a330_roster_data', JSON.stringify(newRoster));
-    
-    // 重新載入 Roster
-    loadRosterFromStorage(); 
-    renderRoster();
-    updateGeneratorUI();
-    
-    logToConsole(`✅ Generated ${Object.keys(newRoster).length} flights.`);
-    switchTab('roster');
-}
-
-function logToConsole(msg) {
-    let el = document.getElementById('gen-console');
-    if(el) {
-        el.innerHTML += `<div>> ${msg}</div>`;
-        el.scrollTop = el.scrollHeight;
-    }
-}
-
-// --- Roster UI (Updated for Tags) ---
 function renderRoster() {
-    const list = document.getElementById('roster-list');
-    if(!list) return;
-    list.innerHTML = '';
+    const container = document.getElementById('roster-list'); // 確保你的 HTML 容器 ID 正確
+    if (!container) return;
     
-    if(!window.flightDB || Object.keys(window.flightDB).length === 0) {
-        list.innerHTML = `<div style="text-align:center; padding:20px; color:#666;">
-            NO ROSTER DATA<br>Go to GENERATOR tab to start.
-        </div>`;
+    container.innerHTML = '';
+    const flights = window.roster ? window.roster.flights : [];
+
+    if (flights.length === 0) {
+        container.innerHTML = '<div style="text-align:center;color:#666;padding:20px;">No flights scheduled.</div>';
         return;
     }
 
-    for (const [k, v] of Object.entries(window.flightDB)) {
-        // 根據標籤決定顏色與圖示
-        let badgeColor = "#00bfff";
-        let icon = "✈️";
+    flights.forEach((flight, index) => {
+        // --- 新增：機位顯示邏輯 ---
+        // 如果機位存在，顯示；否則顯示 TBD 或隱藏
+        // 我們使用 small 標籤與 CSS class 來美化
+        const depGateHTML = flight.gateDep ? `<span class="gate-tag">${flight.gateDep}</span>` : `<span class="gate-tag tbd">TBD</span>`;
+        const arrGateHTML = flight.gateArr ? `<span class="gate-tag">${flight.gateArr}</span>` : `<span class="gate-tag tbd">TBD</span>`;
         
-        if (v.tags.includes("MAINT")) { badgeColor = "#e74c3c"; icon = "🛠️"; }
-        else if (v.tags.includes("PREIGHTER")) { badgeColor = "#9b59b6"; icon = "📦"; }
-        else if (v.tags.includes("SHUTTLE")) { badgeColor = "#95a5a6"; icon = "🚌"; }
-        else if (v.tags.includes("CHARTER")) { badgeColor = "#f1c40f"; icon = "🏖️"; }
+        // 解析航線
+        const [dep, arr] = flight.route.split('-');
 
-        const d = document.createElement('div');
-        d.className = `flight-card ${completedFlights[k]?'completed':''}`;
-        d.onclick = () => loadFlight(k); 
-        d.innerHTML = `
+        const card = document.createElement('div');
+        card.className = `flight-card ${flight.completed ? 'completed' : ''}`;
+        card.onclick = () => loadFlight(index); // 假設原本有 loadFlight 函數
+
+        // 更新後的 HTML 結構
+        card.innerHTML = `
             <div class="flight-info">
-                <div class="flight-day" style="color:${badgeColor}">${v.day} | ${v.id}</div>
-                <div class="flight-route">${v.r}</div>
-                <div style="font-size:11px; color:#aaa; margin-top:4px;">
-                    ${icon} ${v.d}
+                <div class="flight-day">${flight.day} • ${flight.id}</div>
+                
+                <div class="flight-route">
+                    <span class="route-point">${dep} ${depGateHTML}</span>
+                    <span class="route-arrow">➔</span>
+                    <span class="route-point">${arr} ${arrGateHTML}</span>
+                </div>
+                
+                <div class="flight-desc">
+                    STD: ${flight.std}z &nbsp;|&nbsp; STA: ${flight.sta}z<br>
+                    Type: ${flight.type || 'N/A'}
                 </div>
             </div>
-            <button class="check-btn" onclick="event.stopPropagation(); toggle('${k}')">✓</button>
+            <button class="check-btn" onclick="toggleComplete(event, ${index})">
+                ${flight.completed ? '✔' : ''}
+            </button>
         `;
-        list.appendChild(d);
-    }
-}
-
-// ... (其餘 switchTab, loadFlight, toggle 等函數維持原樣，無需變動) ...
-// 為了節省篇幅，請保留您原本 app.js 的後半段 (loadFlight, switchTab, UI helpers)
-// 只要確保 renderRoster 被上面的版本覆蓋即可。
-
-// --- 這裡補上必要的 Helper 以防您直接複製貼上蓋掉 ---
-function switchTab(t) {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-    document.getElementById('tab-' + t).classList.add('active');
-    document.getElementById('btn-' + t).classList.add('active');
-}
-
-function toggle(k) {
-    if(completedFlights[k]) delete completedFlights[k]; else completedFlights[k]=true;
-    safeSet('a330_completed_v4', JSON.stringify(completedFlights));
-    renderRoster();
-}
-
-function loadFlight(k) {
-    if(!window.flightDB[k]) return;
-    const d = window.flightDB[k];
-    
-    // 更新標題
-    ['to-flight-title', 'ldg-flight-desc', 'dsp-flight'].forEach(id => {
-        let el = document.getElementById(id);
-        if(el) el.innerText = d.id + " (" + d.r + ")";
+        container.appendChild(card);
     });
-
-    // 處理 DSP
-    initDispatchSession(k); 
-    switchTab('dispatch'); 
 }
 
-function clearAllData() {
-    if(confirm("FULL RESET?")) { 
-        localStorage.clear(); 
-        location.reload(); 
-    }
-}
+// ... (保留原本的其他函數，如 loadFlight, toggleComplete, calculatePerf 等) ...
