@@ -1,222 +1,127 @@
 // ==========================================
-// ⚙️ A330 Career Generator (The Engine)
+// 🎲 A330-300 Flight Generator (v2.1 - With Gates)
 // ==========================================
 
-const Generator = {
-    // 系統狀態
-    state: {
-        base: "LSZH",           // 生涯基地
-        location: "LSZH",       // 目前飛機位置
-        maintCounter: 0,        // 累積維修時數
-        totalHours: 0,          // 生涯總時數
-        lastFlightNum: null,    // 上一腿班號 (用於接續)
-        history: []             // 簡單歷史紀錄
-    },
-
-    // 隨機工具
-    rnd: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min,
+window.generator = {
     
-    // 存取狀態
-    load: () => {
-        let s = localStorage.getItem('a330_career_state');
-        if(s) Generator.state = JSON.parse(s);
-    },
-    save: () => {
-        localStorage.setItem('a330_career_state', JSON.stringify(Generator.state));
-    },
-    reset: (base) => {
-        Generator.state = {
-            base: base || "LSZH",
-            location: base || "LSZH",
-            maintCounter: 0,
-            totalHours: 0,
-            lastFlightNum: null,
-            history: []
-        };
-        Generator.save();
+    // --- 輔助工具：從陣列隨機取一個 ---
+    randomChoice: function(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
     },
 
-    // --- 核心生成迴圈 (30天) ---
-    generateMonth: function() {
-        let roster = {};
-        let dayCounter = 1;
+    // --- 核心：機位分配邏輯 ---
+    // 根據機場、任務類型和權重來選擇最真實的機位
+    assignGate: function(icao, flightType) {
+        // 1. 檢查資料庫是否存在
+        if (!window.gateDB || !window.gateDB[icao]) return "TBD";
         
-        // 如果是新生涯，第一天必須從基地出發
-        if (Generator.state.history.length === 0) {
-            Generator.state.location = Generator.state.base;
+        const airportData = window.gateDB[icao];
+        const zones = Object.keys(airportData); // 取得該機場所有區域 (例如 ["Dock E", "Apron", ...])
+        let candidateZones = [];
+
+        // --- 蘇黎世 (LSZH) 專用邏輯 ---
+        if (icao === 'LSZH') {
+            if (flightType === 'LONG') {
+                // 長程客機：優先 Dock E (非申根)，其次 Dock B
+                candidateZones = zones.filter(z => z.includes('Dock E'));
+                if (candidateZones.length === 0) candidateZones = zones.filter(z => z.includes('Dock B'));
+            } else if (flightType === 'SHORT') {
+                // 短程客機：優先 Dock A/B/D (申根區)
+                candidateZones = zones.filter(z => z.includes('Dock A') || z.includes('Dock B'));
+            } else {
+                // 貨運/維修/飛渡：優先 Remote 或 Apron
+                candidateZones = zones.filter(z => z.includes('Remote') || z.includes('Apron') || z.includes('Maint'));
+            }
+        } 
+        // --- 外站通用邏輯 ---
+        else {
+            if (['CARGO', 'FERRY', 'MAINT'].includes(flightType)) {
+                // 非客運：優先找機坪、貨運區
+                candidateZones = zones.filter(z => 
+                    z.toLowerCase().includes('apron') || 
+                    z.toLowerCase().includes('remote') || 
+                    z.toLowerCase().includes('cargo')
+                );
+            } else {
+                // 客運：優先找航廈、空橋
+                candidateZones = zones.filter(z => 
+                    z.toLowerCase().includes('terminal') || 
+                    z.toLowerCase().includes('concourse') || 
+                    z.toLowerCase().includes('gate') ||
+                    z.toLowerCase().includes('dock')
+                );
+            }
         }
 
-        while(dayCounter <= 30) {
-            let flight = Generator.createDailyFlight(dayCounter);
+        // --- 兜底機制 (Fallback) ---
+        // 如果上述篩選找不到任何區域 (或資料庫命名不標準)，則使用該機場所有可用區域
+        if (candidateZones.length === 0) {
+            candidateZones = zones;
+        }
+
+        // 2. 從候選區域中選一個區域
+        const selectedZoneName = this.randomChoice(candidateZones);
+        const selectedZoneGates = airportData[selectedZoneName];
+
+        // 3. 從該區域的機位清單中隨機選一個機位
+        // 如果該區域是空的 (防呆)，回傳 TBD
+        if (!selectedZoneGates || selectedZoneGates.length === 0) return "TBD";
+
+        return this.randomChoice(selectedZoneGates);
+    },
+
+    // --- 生成班表主程序 ---
+    generateSchedule: function() {
+        if (!window.routes || !window.roster) {
+            console.error("Missing routes or roster database.");
+            return;
+        }
+
+        // 清空現有班表
+        window.roster.flights = [];
+        const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        
+        // 簡單的權重生成 (範例：生成 5-8 個航班)
+        const numFlights = Math.floor(Math.random() * 4) + 5; 
+
+        for (let i = 0; i < numFlights; i++) {
+            // 隨機選一條航線
+            const routeKey = this.randomChoice(Object.keys(window.routes));
+            const routeData = window.routes[routeKey];
             
-            if(flight) {
-                // 如果是維修或長時間過夜，可能佔用多天 (此處簡化為1天1腿)
-                roster[flight.id] = flight;
-                
-                // 更新狀態
-                Generator.state.location = flight.dest;
-                Generator.state.totalHours += (flight.time / 60);
-                
-                if (flight.tags.includes("MAINT")) {
-                    Generator.state.maintCounter = 0; // 重置維修
-                } else {
-                    Generator.state.maintCounter += (flight.time / 60);
-                }
-                
-                // 記錄班號 (僅限常規航班)
-                if(!flight.tags.includes("FERRY") && !flight.tags.includes("MAINT")) {
-                     Generator.state.lastFlightNum = parseInt(flight.id.replace("LX","")) || null;
-                }
-            }
-            dayCounter++;
-        }
-        
-        Generator.save();
-        return roster;
-    },
+            // 決定日期
+            const day = this.randomChoice(days);
 
-    // --- 每日決策樹 (Decision Tree) ---
-    createDailyFlight: function(day) {
-        let s = Generator.state;
-        let db = window.routeDB;
-        let flight = null;
-        let flightId = `Day ${String(day).padStart(2, '0')}`;
-        
-        // 1. 維修強制判定 (Priority 1)
-        if (s.maintCounter > 500) {
-            return Generator.createMaintFlight(flightId, s.location, s.base);
-        }
+            // 解析起降機場
+            const [depICAO, arrICAO] = routeKey.split('-');
 
-        // 2. 雙基地調機判定 (Priority 2)
-        // 假設：有 10% 機率需要換基地任務，或者被迫調機
-        // 簡化：如果人在 LSGG 但抽到 LSZH 任務 (下一步驟判定)，這裡先處理 "Shuttle"
-        
-        // 3. 尋找可用航班 (Filter)
-        // 找出所有從當前位置出發的航班
-        let candidates = db.regular.filter(r => r.route.startsWith(s.location));
-        
-        // 如果在外站 (Outstation)，必須回家 (Return to Hub)
-        if (!["LSZH", "LSGG"].includes(s.location)) {
-            // 嘗試尋找完美接續 (n+1)
-            if (s.lastFlightNum) {
-                let targetNum = s.lastFlightNum % 2 === 0 ? s.lastFlightNum + 1 : s.lastFlightNum; 
-                // 瑞航慣例：偶數去，奇數回。如果上一班是974(偶)，這班找975(奇)
-                
-                let match = candidates.find(c => c.inbound.includes(targetNum));
-                if (match) {
-                    return Generator.buildFlight(flightId, match, "INBOUND", targetNum);
-                }
-            }
-            // 若無完美接續，隨機回程
-            let randomReturn = candidates[Generator.rnd(0, candidates.length - 1)];
-            if(randomReturn) {
-                 // 隨機挑一個奇數班號
-                 let fNum = randomReturn.inbound[Generator.rnd(0, randomReturn.inbound.length-1)];
-                 return Generator.buildFlight(flightId, randomReturn, "INBOUND", fNum);
-            }
+            // --- 新增：分配機位 ---
+            // 根據 flightType (例如 LONG, SHORT) 分配
+            // 如果 routes.js 沒有定義 type，預設為 LONG (A330 常用)
+            const fType = routeData.type || 'LONG'; 
             
-            // 真的找不到路？觸發調機回基地
-            return Generator.createFerryFlight(flightId, s.location, s.base);
+            const gateDep = this.assignGate(depICAO, fType);
+            const gateArr = this.assignGate(arrICAO, fType);
+
+            // 建立航班物件
+            let newFlight = {
+                id: "LX" + (Math.floor(Math.random() * 899) + 100), // 隨機航班號 LX100-LX999
+                route: routeKey,
+                std: routeData.std || "1000", // 若無定義則給預設值
+                sta: routeData.sta || "1800",
+                day: day,
+                type: fType,
+                gateDep: gateDep, // 新增欄位
+                gateArr: gateArr  // 新增欄位
+            };
+
+            window.roster.flights.push(newFlight);
         }
 
-        // --- 在基地 (Hub) ---
-        
-        // 4. 特殊事件判定 (Special Events)
-        let dice = Generator.rnd(1, 100);
-        
-        // A. 包機 (5%)
-        if (dice <= 5) {
-            let charterDest = db.charters[Generator.rnd(0, db.charters.length-1)];
-            return Generator.createCharterFlight(flightId, s.location, charterDest);
-        }
+        // 依照日期排序 (簡單邏輯：Mon -> Sun)
+        const dayOrder = { "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6, "Sun": 7 };
+        window.roster.flights.sort((a, b) => dayOrder[a.day] - dayOrder[b.day]);
 
-        // B. 正常排班
-        // 從基地出發，隨機選一個目的地
-        let potentialRoutes = db.regular.filter(r => r.route.startsWith(s.location));
-        
-        // 如果目前在 LSGG，但隨機選到了 LSZH 出發的表 (邏輯保護)
-        // 這裡簡化：只選出發地符合的
-        
-        if(potentialRoutes.length > 0) {
-            let selectedRoute = potentialRoutes[Generator.rnd(0, potentialRoutes.length-1)];
-            let fNum = selectedRoute.outbound[Generator.rnd(0, selectedRoute.outbound.length-1)];
-            
-            // C. 客改貨判定 (Preighter) - 15%
-            let isPreighter = false;
-            if (selectedRoute.isCargoHotspot && Generator.rnd(1, 100) <= 15) {
-                isPreighter = true;
-            }
-
-            return Generator.buildFlight(flightId, selectedRoute, "OUTBOUND", fNum, isPreighter);
-        } else {
-            // 在基地卻無處可去？調機去另一個基地
-            let targetHub = s.location === "LSZH" ? "LSGG" : "LSZH";
-            return Generator.createShuttleFlight(flightId, s.location, targetHub);
-        }
-    },
-
-    // --- 輔助建構函數 ---
-    buildFlight: function(id, routeData, dir, fNum, isPreighter) {
-        let dest = routeData.route.split('-')[1];
-        let tags = [];
-        
-        if (routeData.type === "SHUTTLE") tags.push("SHUTTLE");
-        else if (routeData.type === "LONG") tags.push("LONG");
-        else tags.push("SHORT");
-
-        if (isPreighter) tags.push("PREIGHTER"); // 📦 關鍵標籤
-        else tags.push("PAX");
-
-        let depTime = "08:00"; // 簡化時間
-        
-        return {
-            day: id,
-            id: "LX" + fNum,
-            r: routeData.route,
-            dist: Math.round(routeData.time * 8), // 估算距離
-            time: routeData.time,
-            type: isPreighter ? "CGO" : "PAX",
-            profile: isPreighter ? "CARGO" : "BIZ",
-            dest: dest,
-            tags: tags,
-            d: `${tags.join(' | ')}`
-        };
-    },
-
-    createMaintFlight: function(id, from, to) {
-        let num = "LX" + Generator.rnd(9000, 9999);
-        return {
-            day: id, id: num, r: `${from}-${to}`, dist: 0, time: 120,
-            type: "MAINT", profile: "FERRY", dest: to, tags: ["MAINT", "FERRY"],
-            d: "🛠️ MANDATORY MAINTENANCE FERRY"
-        };
-    },
-    
-    createFerryFlight: function(id, from, to) {
-        let num = "LX" + Generator.rnd(9000, 9999);
-        return {
-            day: id, id: num, r: `${from}-${to}`, dist: 0, time: 120,
-            type: "FERRY", profile: "FERRY", dest: to, tags: ["FERRY"],
-            d: "⚠️ POSITIONING FLIGHT"
-        };
-    },
-    
-    createShuttleFlight: function(id, from, to) {
-         // 使用真實區段
-         let num = "LX" + Generator.rnd(2800, 2819);
-         return {
-            day: id, id: num, r: `${from}-${to}`, dist: 125, time: 45,
-            type: "PAX", profile: "BIZ", dest: to, tags: ["SHUTTLE"],
-            d: "🇨🇭 HUB SHUTTLE"
-        };
-    },
-
-    createCharterFlight: function(id, from, destObj) {
-        let num = "LX" + Generator.rnd(8000, 8999);
-        return {
-            day: id, id: num, r: `${from}-${destObj.dest}`, dist: Math.round(destObj.time * 8), time: destObj.time,
-            type: "PAX", profile: "LEISURE", dest: destObj.dest, tags: ["CHARTER"],
-            d: `🏖️ CHARTER: ${destObj.name}`
-        };
+        console.log(`Generated ${window.roster.flights.length} flights with gate assignments.`);
     }
 };
